@@ -16,7 +16,7 @@ PARENT="${SUB#*.}"
 
 find_zone() { # profile name
     aws --profile "$1" route53 list-hosted-zones-by-name --dns-name "$2." \
-        --query "HostedZones[?Name=='$2.' && !Config.PrivateZone].Id | [0]" --output text
+        --query "HostedZones[?Name=='$2.' && Config.PrivateZone==`false`].Id | [0]" --output text
 }
 
 zone="$(find_zone "$STAGE_PROFILE" "$SUB")"
