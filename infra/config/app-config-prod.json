@@ -23,8 +23,8 @@
     },
     "Web": {
       "Name": "Web",
-      "DomainName": "",
-      "HostedZoneId": "",
+      "DomainName": "nathanjonesphoto.co",
+      "HostedZoneId": "Z03593683IQEU3H9CHJ32",
       "CspReportOnly": false
     },
     "Ops": {
