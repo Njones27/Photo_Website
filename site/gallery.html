@@ -1,0 +1,935 @@
+<title>Nathan Jones Gallery</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,400..600&family=Hanken+Grotesk:wght@300..700&display=swap">
+<link rel="stylesheet" href="shared/core.css">
+<style>
+/* Layout: one long gallery wall you scroll down. Each shoot is a story: a full-bleed opener you stand in,
+   then prints hung on a lit wall with museum labels. The wall takes on the light of the print in view.
+   On phones, labels sit under each print and a small pill at the bottom names the story you're in. */
+:root {
+  --display: "Bodoni Moda", Didot, "Bodoni 72", Georgia, serif;
+  --text: "Hanken Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --gl: max(20px, env(safe-area-inset-left, 0px));
+  --gr: max(20px, env(safe-area-inset-right, 0px));
+  --lamp: rgba(255, 238, 214, .08);  /* warm track lighting on the wall */
+}
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body { font-family: var(--text); font-size: 16px; line-height: 1.55; }
+body::before { /* ambient light from the photo in view; a fixed layer so it also works on iOS */
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(75% 60% at 50% 0%, color-mix(in oklab, var(--glow) 16%, transparent), transparent),
+    linear-gradient(color-mix(in oklab, var(--base) 85%, #000), var(--deep));
+}
+a { color: inherit; }
+img { max-width: 100%; }
+
+/* ---------- top bar: always on screen; once you scroll it gets a frosted backing so it reads over photos ---------- */
+.top {
+  position: fixed; inset: 0 0 auto; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: calc(14px + env(safe-area-inset-top, 0px)) var(--gr) 14px var(--gl);
+  background: linear-gradient(color-mix(in oklab, var(--deep) 80%, transparent), transparent);
+  border-bottom: 1px solid transparent;
+  transition: background-color .3s ease, border-color .3s ease, padding .3s ease;
+}
+.is-scrolled .top { padding-block: calc(8px + env(safe-area-inset-top, 0px)) 8px;
+  background: color-mix(in oklab, var(--deep) 74%, transparent); border-bottom-color: var(--faint);
+  backdrop-filter: blur(14px) saturate(1.2); -webkit-backdrop-filter: blur(14px) saturate(1.2); }
+.top-l { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.mark { font-family: var(--display); font-size: 21px; text-decoration: none; white-space: nowrap; }
+.top-back { flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px 0 10px; border-radius: 999px;
+  border: 1px solid var(--faint); background: none; color: var(--ink); font: 500 14px var(--text); cursor: pointer; white-space: nowrap; }
+.top-back::before { content: ""; width: 7px; height: 7px; border: solid currentColor; border-width: 0 0 1.5px 1.5px; rotate: 45deg; margin-left: 4px; }
+.top-back:hover { border-color: var(--ink); }
+.top-back:focus-visible { outline: 2px solid var(--glow); outline-offset: 2px; }
+@media (max-width: 560px) { /* phones: the arrow alone, so the name and links still fit on one row */
+  .top-back { width: 40px; padding: 0; justify-content: center; }
+  .top-back::before { margin: 0 0 0 3px; }
+  .top-back span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .top-l { gap: 10px; } .top-links { gap: 16px; }
+}
+@media (max-width: 420px) { /* narrow phones: a smaller name and a shorter booking link so the row never crowds */
+  .mark { font-size: 18px; } .top-links { gap: 14px; } .top .long { display: none; }
+}
+#book { scroll-margin-top: 64px; } /* clear of the fixed top bar */
+.top-links { display: flex; gap: 22px; }
+.top a.book-link { font-size: 14px; text-decoration: none; white-space: nowrap; padding: 10px 0; border-bottom: 1px solid var(--glow); line-height: 1; }
+
+/* ---------- hero ---------- */
+.hero { position: relative; height: 100svh; min-height: 360px; overflow: hidden; }
+.hero img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 38% 50%; }
+.hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, var(--deep) 0%, color-mix(in oklab, var(--deep) 35%, transparent) 40%, transparent 65%); }
+.hero-copy { position: absolute; z-index: 1; left: var(--gl); right: var(--gr); bottom: calc(clamp(24px, 7vh, 72px) + env(safe-area-inset-bottom, 0px)); display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 20px 40px; }
+.hero h1 { margin: 0; font-family: var(--display); font-weight: 400; font-size: clamp(52px, min(13vw, 22vh), 200px); line-height: .88; letter-spacing: -.035em; }
+/* what Nathan shoots, each a way into its collection; pipes between on wide screens, plain gaps when it wraps on phones */
+.hero-cats { list-style: none; margin: 18px 0 0; padding: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 0;
+  font-size: clamp(15px, 1.5vw, 20px); font-weight: 600; text-shadow: 0 1px 14px rgba(0, 0, 0, .45); }
+.hero-cats li + li::before { content: "|"; margin: 0 .6em; font-weight: 300; color: var(--muted); }
+.hero-cats a { text-decoration: none; }
+.hero-cats a:hover, .hero-cats a:focus-visible { color: var(--glow); }
+@media (max-width: 560px) { /* two even rows, never one word left alone */
+  .hero-cats { display: block; text-wrap: balance; font-size: 15px; line-height: 1.8; }
+  .hero-cats li { display: inline; margin-right: 14px; }
+  .hero-cats li + li::before { content: none; } }
+
+/* museum label, used everywhere a photo is described */
+.label { font-size: 13px; line-height: 1.5; color: var(--muted); }
+.label strong { display: block; color: var(--ink); font-size: 15px; font-weight: 600; }
+.label .gear { display: block; }
+/* never leave one word alone on a line: even out a wrapped title or gear line */
+.label strong, .label .gear { text-wrap: balance; }
+.opener .where, .opener .note, .tile .sub, .cat-head > p { text-wrap: pretty; }
+.label .nj-readout { margin-top: 6px; font-size: 12.5px; gap: 2px 12px; }
+.hero .label { max-width: 300px; }
+@media (max-width: 700px), (max-height: 500px) { .hero .label { display: none; } }
+
+/* Big display titles: Bodoni's automatic optical size thins hairlines to ~1px at 100px+, which breaks letters like N.
+   Pin a text-size cut so the thin strokes hold up over photos. */
+.hero h1, .opener h2, .index h2, .archive h2 { font-variation-settings: "opsz" 24; font-weight: 500; }
+.hero h1, .opener h2 { text-shadow: 0 2px 28px rgba(0, 0, 0, .35); }
+
+/* ---------- story index ---------- */
+.index { max-width: 1180px; margin: 0 auto; padding: clamp(72px, 12vh, 140px) var(--gr) clamp(40px, 8vh, 80px) var(--gl); }
+.index h2 { margin: 0 0 8px; font-family: var(--display); font-weight: 400; font-size: clamp(36px, 5vw, 64px); line-height: 1; }
+.index > p { margin: 0 0 32px; color: var(--muted); max-width: 34em; }
+.stories { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--faint); }
+.stories a { display: grid; grid-template-columns: minmax(0, 1fr) auto 64px; gap: 20px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--faint); text-decoration: none; min-height: 44px; }
+.stories .nm { font-family: var(--display); font-size: clamp(22px, 2.6vw, 34px); line-height: 1.1; min-width: 0; }
+.stories .wh { font-size: 14px; color: var(--muted); text-align: right; }
+.stories .nj-thumb { width: 64px; height: 64px; }
+.stories a:hover .nm, .stories a:focus-visible .nm { color: var(--glow); }
+@media (max-width: 700px) {
+  .stories a { grid-template-columns: minmax(0, 1fr) 72px; gap: 4px 14px; }
+  .stories .nm, .stories .wh { grid-column: 1; }
+  .stories .wh { text-align: left; font-size: 13px; }
+  .stories .nj-thumb { grid-column: 2; grid-row: 1 / span 2; width: 72px; height: 72px; }
+}
+
+/* ---------- story opener ---------- */
+.story { position: relative; }
+.opener { height: 165svh; position: relative; }
+.opener-pin { position: sticky; top: 0; height: 100svh; overflow: hidden; cursor: zoom-in; }
+.opener-pin > img { width: 100%; height: 100%; object-fit: cover; }
+.opener-pin::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(to top, color-mix(in oklab, var(--deep) 90%, transparent) 0%, color-mix(in oklab, var(--deep) 30%, transparent) 45%, transparent 65%); }
+.opener-copy { position: absolute; z-index: 1; left: var(--gl); right: var(--gr); bottom: calc(max(84px, 9vh) + env(safe-area-inset-bottom, 0px)); max-width: 980px; pointer-events: none; }
+.opener h2 { margin: 0; font-family: var(--display); font-weight: 400; font-size: clamp(44px, min(9.5vw, 17vh), 148px); line-height: .92; letter-spacing: -.03em; text-wrap: balance; }
+.opener .where { margin-top: 12px; font-size: 14px; color: var(--muted); }
+.opener .note { margin: 12px 0 0; max-width: 32em; font-size: clamp(15px, 1.4vw, 19px); color: color-mix(in oklab, var(--ink) 86%, transparent); }
+.opener .quote { margin: 16px 0 0; }
+.opener .quote, .opener .note, .opener .where { text-shadow: 0 1px 16px rgba(0, 0, 0, .55); } /* stays legible over bright skies */
+.opener .quote blockquote { margin: 0; font-family: var(--display); font-style: italic; font-size: clamp(19px, 2vw, 28px); line-height: 1.3; text-wrap: pretty; color: var(--ink); }
+.opener .quote figcaption { margin-top: 8px; font-size: 14px; color: var(--muted); }
+.opener .quote figcaption::before { content: "– "; }
+/* covers whose subject fills the lower frame: sit the copy closer to the bottom edge, still clear of the pill */
+@media (min-width: 720px) and (min-height: 501px) { .opener-copy.is-low { bottom: calc(40px + env(safe-area-inset-bottom, 0px)); } }
+@media (max-height: 500px) { .opener .note { display: none; } .opener-copy { bottom: 72px; } }
+/* a vertical cover on a wide screen: hang the whole photo to the right, lit by a blur of itself, title on the left */
+@media (min-aspect-ratio: 1 / 1) {
+  .opener-pin.is-tall::before { content: ""; position: absolute; inset: -12%; background: inherit; filter: blur(48px) saturate(1.25) brightness(.42); }
+  .opener-pin.is-tall > img { position: relative; box-sizing: border-box; padding: max(64px, 8svh) 0 max(28px, 4svh); object-fit: contain; object-position: 84% 50%;
+    filter: drop-shadow(0 30px 60px rgba(0, 0, 0, .55)); }
+  .opener-pin.is-tall::after { background: linear-gradient(to right, color-mix(in oklab, var(--deep) 70%, transparent), transparent 55%); }
+  /* the copy takes all the room left of the photo: --pw is the photo's on-screen width, from its aspect ratio */
+  .opener-pin.is-tall { --pw: calc(var(--ar, .667) * (100svh - max(64px, 8svh) - max(28px, 4svh))); --cl: max(var(--gl), 5vw); }
+  .opener-pin.is-tall .opener-copy { left: var(--cl); right: auto; width: calc(.84 * (100vw - var(--pw)) - var(--cl) - 56px); max-width: 900px; }
+  .opener-pin.is-tall .where { margin-top: 18px; }
+  .opener-pin.is-tall .quote { margin-top: 28px; }
+  .opener-pin.is-tall .quote blockquote { max-width: 26em; }
+  .opener-pin.is-tall h2 { font-size: clamp(40px, min(6vw, 14vh), 110px); }
+}
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .opener-pin > img { animation: settle linear both; animation-timeline: view(); animation-range: entry 0% exit 40%; }
+    @keyframes settle { from { scale: 1.12; } to { scale: 1; } }
+  }
+}
+
+/* ---------- the wall ---------- */
+.wall {
+  display: grid; justify-items: center; gap: clamp(88px, 16vh, 180px);
+  padding: clamp(96px, 16vh, 180px) var(--gr) clamp(110px, 18vh, 200px) var(--gl);
+  overflow-x: clip; /* full width, so light spilling past a print is cut only at the screen edge */
+}
+.hang { --label: 300px; margin: 0; display: grid; grid-template-columns: max-content var(--label); gap: 28px; align-items: end; max-width: 100%; }
+.hang.flip { grid-template-columns: var(--label) max-content; }
+.hang.flip .print { order: 2; }
+.hang.flip .label { text-align: right; }
+.hang.flip .label .nj-readout { justify-content: flex-end; }
+.hang.pair { grid-template-columns: max-content max-content; gap: clamp(24px, 4vw, 64px); align-items: start; }
+.hang.pair > figure { display: grid; gap: 16px; margin: 0; width: min-content; }
+
+.print { position: relative; margin: 0; cursor: zoom-in; border: 0; padding: 0; background: none; display: block; isolation: isolate; }
+.print::before { /* track light: a soft pool centered just above the print, fading to nothing before its edges */
+  content: ""; position: absolute; inset: -55% -35% -25%; z-index: -1; pointer-events: none;
+  background: radial-gradient(closest-side, color-mix(in oklab, var(--pglow) 34%, var(--lamp)), color-mix(in oklab, var(--pglow) 10%, transparent) 60%, transparent);
+  translate: 0 -12%;
+}
+.print img {
+  display: block; height: auto; max-width: none; background-size: cover; /* sized below in screen units */
+  outline: 1px solid color-mix(in oklab, var(--ink) 10%, transparent);
+  box-shadow: 0 2px 6px rgba(0,0,0,.45), 0 34px 70px -26px rgba(0,0,0,.7), 0 0 150px -10px color-mix(in oklab, var(--pglow) 70%, transparent);
+  transition: translate .8s var(--ease-out);
+}
+@media (hover: hover) { .print:hover img { translate: 0 -6px; } }
+.print:focus-visible { outline: none; }
+.print:focus-visible img { outline: 2px solid var(--glow); outline-offset: 6px; }
+/* print sizes: never taller than the screen, never wider than the room left beside the label */
+.land img { width: min(100vw - var(--label) - 100px, 1060px, 78svh * var(--ar)); }
+.land.feature img { width: min(100vw - var(--label) - 100px, 1240px, 82svh * var(--ar)); }
+.tall img { width: min(100vw - var(--label) - 100px, 84svh * var(--ar), 980px * var(--ar)); }
+.pair .print img { width: min(84svh * var(--ar), 50vw - 60px, 560px); }
+
+@media (max-width: 760px) {
+  .wall { gap: 72px; padding-top: 72px; padding-bottom: 96px; justify-items: stretch; }
+  .hang, .hang.flip, .hang.pair { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .hang.flip .print { order: 0; }
+  .hang.flip .label { text-align: left; }
+  .hang.flip .label .nj-readout { justify-content: flex-start; }
+  .hang.pair { gap: 72px; }
+  .hang.pair > figure { width: auto; }
+  .land img, .land.feature img, .tall img, .pair .print img { width: 100%; max-width: 100%; }
+}
+
+/* ---------- booking ---------- */
+/* Rate card on the left of the wall, an estimator below it; priced by the edited photo, so the estimator is a row of
+   small prints that light up as you add photos. One reveal when the section scrolls in: rules draw, prices count up. */
+.commission { max-width: 1320px; margin: 0 auto; padding: clamp(40px, 8vh, 100px) var(--gr) clamp(96px, 16vh, 180px) var(--gl);
+  display: grid; grid-template-columns: minmax(0, 6fr) minmax(0, 5fr); grid-template-areas: "intro rates" "est form";
+  column-gap: clamp(32px, 6vw, 96px); row-gap: clamp(56px, 9vh, 104px); align-items: start; }
+.book-intro { grid-area: intro; } .rates { grid-area: rates; } .estimate { grid-area: est; } #book-form { grid-area: form; }
+.commission h2 { margin: 0; font-family: var(--display); font-weight: 400; font-size: clamp(44px, 6vw, 92px); line-height: .95; letter-spacing: -.02em; }
+.book-intro p { color: var(--muted); max-width: 26em; margin: 20px 0 0; text-wrap: pretty; }
+.book-intro .pay { font-size: 14px; margin-top: 14px; }
+.rates { list-style: none; margin: 0; padding: 0; }
+.rate { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 4px 24px; padding: 20px 0 22px; }
+.rate::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: var(--faint); transform-origin: left; }
+.rate:first-child::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1px; background: var(--faint); transform-origin: left; }
+.rate strong { display: block; font-size: 18px; font-weight: 600; }
+.rate .terms { display: block; margin-top: 2px; font-size: 14px; color: var(--muted); text-wrap: pretty; }
+.rate .price { text-align: right; white-space: nowrap; }
+.rate .num, .est-total .num { font-family: var(--display); font-variant-numeric: lining-nums tabular-nums; letter-spacing: -.02em; }
+.rate .num { font-size: clamp(34px, 3.4vw, 48px); line-height: 1; }
+.rate .unit { display: block; margin-top: 4px; font-size: 13px; color: var(--muted); }
+
+.estimate h3 { margin: 0; font-family: var(--display); font-weight: 400; font-size: clamp(28px, 2.6vw, 36px); line-height: 1.05; }
+.est-types { display: flex; flex-wrap: nowrap; gap: 6px; margin: 15px -4px 0; padding: 3px 4px; overflow-x: auto; scrollbar-width: none; } /* one row; a swipe on phones */
+.est-types::-webkit-scrollbar { display: none; }
+.est-types button { flex: none; white-space: nowrap; font: 500 clamp(12.5px, 1.05vw, 14px) var(--text); color: var(--ink); background: none; border: 1px solid var(--faint); border-radius: 999px;
+  min-height: 40px; padding: 0 clamp(11px, 1.1vw, 16px); cursor: pointer; transition: border-color .2s ease, background-color .2s ease; }
+.est-types button:hover { border-color: color-mix(in oklab, var(--ink) 50%, transparent); }
+.est-types button[aria-pressed="true"] { border-color: var(--glow); background: color-mix(in oklab, var(--glow) 18%, transparent); }
+.est-types button:focus-visible, .est-book:focus-visible { outline: 2px solid var(--glow); outline-offset: 2px; }
+/* the estimator: your photos as a hand of prints, chosen on a strip of film. Adding a photo drops a print onto the pile
+   with a warm yellow flare and a small shake; removing one lifts it off and the hand closes up. */
+.estimate { --flare: #f6c64a; --paper: #f3f1ec; --remove: #c3c7cd; }
+.estimate img { -webkit-user-drag: none; user-select: none; -webkit-user-select: none; }
+.est-fan { position: relative; height: 270px; margin-top: 18px; overflow: hidden; }
+.estimate .ph { display: block; width: 100%; aspect-ratio: 1; background-color: #111; background-size: 600% 400%; background-repeat: no-repeat; }
+.est-fan .card { --lift: 0px; position: absolute; left: 50%; bottom: 62px; width: 112px; margin-left: -56px;
+  transform-origin: 50% 210%; background: var(--paper); padding: 5px 5px 16px; box-shadow: 0 8px 22px rgba(0,0,0,.55); translate: 0 var(--lift);
+  transition: rotate .5s var(--ease-out), translate .5s var(--ease-out), opacity .3s ease; }
+.est-fan .card.extra { --lift: -14px; }
+.est-fan .card.extra::after, .scrub .fr.extra::after { content: "+$5"; position: absolute; padding: 3px 6px; border-radius: 999px; background: #121417;
+  color: var(--flare); font: 700 12px/1 var(--text); font-variant-numeric: tabular-nums; }
+.est-fan .card.extra::after { right: 5px; bottom: 2px; }
+.est-fan .card.off { opacity: 0; translate: 0 calc(var(--lift) - 36px); scale: .96; filter: blur(1px); pointer-events: none;
+  transition: opacity .48s cubic-bezier(.4, 0, .2, 1) .06s, translate .6s cubic-bezier(.33, 0, .15, 1), scale .6s cubic-bezier(.33, 0, .15, 1), filter .5s ease; }
+.est-fan.closing .card:not(.off) { transition: rotate .65s cubic-bezier(.33, 0, .15, 1) .1s, translate .5s var(--ease-out), opacity .3s ease; }
+.est-fan .card.land { animation: land .6s cubic-bezier(.2, .9, .3, 1.25) both, flare 1.3s ease-out both; animation-delay: var(--d, 0ms); }
+@keyframes land { 0% { translate: 0 calc(var(--lift) - 120px); scale: 1.14; opacity: 0; } 45% { opacity: 1; } 70% { translate: 0 calc(var(--lift) + 5px); scale: .97; } 100% { translate: 0 var(--lift); scale: 1; opacity: 1; } }
+@keyframes flare { 0%, 35% { box-shadow: 0 0 0 3px var(--flare), 0 0 34px 6px color-mix(in oklab, var(--flare) 70%, transparent), 0 8px 22px rgba(0,0,0,.55); }
+  100% { box-shadow: 0 0 0 0 transparent, 0 0 0 0 transparent, 0 8px 22px rgba(0,0,0,.55); } }
+.est-fan.thud { animation: thud .32s ease-out; } @keyframes thud { 40% { scale: 1 .985; } }
+.estimate.shake { animation: shake .28s linear; }
+@keyframes shake { 20% { translate: -3px 1px; } 40% { translate: 3px -1px; } 60% { translate: -2px 1px; } 80% { translate: 1px 0; } 100% { translate: 0 0; } }
+.scrub { position: relative; height: 136px; overflow: hidden; border-radius: 4px; background: linear-gradient(transparent 40px, #0a0a0a 40px);
+  touch-action: pan-y; user-select: none; -webkit-user-select: none; cursor: grab; }
+.scrub.dragging { cursor: grabbing; }
+.scrub:focus-visible { outline: 2px solid var(--flare); outline-offset: 3px; }
+.scrub::before, .scrub::after { content: ""; position: absolute; left: 0; right: 0; height: 7px; z-index: 1; background: repeating-linear-gradient(90deg, #262626 0 9px, transparent 9px 18px); }
+.scrub::before { top: 46px; } .scrub::after { bottom: 6px; }
+.scrub .strip { position: absolute; top: 58px; left: 50%; display: flex; gap: 6px; transition: translate .35s var(--ease-out); }
+.scrub.dragging .strip { transition: none; }
+.scrub .fr { flex: none; width: 66px; height: 64px; background: #050505; position: relative; opacity: .35; transition: opacity .2s ease; }
+.scrub .fr .ph { height: 100%; aspect-ratio: auto; pointer-events: none; }
+.scrub .fr.on { opacity: 1; }
+.scrub .fr.extra::after { right: 3px; top: 3px; padding: 2px 5px; font-size: 11px; }
+.scrub .fr.next, .scrub .fr.prev { cursor: pointer; }
+.scrub .fr.next { opacity: 1; }
+.scrub .fr.next .ph { opacity: .3; }
+.scrub .fr.next::before, .scrub .fr.prev::before { position: absolute; inset: 0; z-index: 1; display: grid; place-items: center; border-radius: 2px; font: 700 12px/1 var(--text); }
+.scrub .fr.next::before { content: "+ Add"; border: 1.5px dashed var(--flare); color: var(--flare); background: rgba(0,0,0,.35); font-size: 13px; }
+.scrub .fr.prev::before { content: "− Remove"; border: 1.5px dashed #8b9098; color: var(--remove); background: rgba(0,0,0,.55); }
+.scrub .fr.prev.extra::after { display: none; }
+.scrub .win { position: absolute; left: 50%; top: 52px; bottom: 14px; width: 76px; translate: -50% 0; z-index: 2; pointer-events: none;
+  border: 2px solid var(--flare); border-radius: 3px; box-shadow: 0 0 0 999px rgba(0,0,0,.35), 0 0 18px color-mix(in oklab, var(--flare) 50%, transparent); }
+.scrub .win span { position: absolute; left: 50%; top: -44px; translate: -50% 0; padding: 5px 14px; border-radius: 999px; border: 1.5px solid var(--flare);
+  background: #0a0a0a; color: var(--flare); font: 700 15px/1.2 var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.scrub-hint { margin: 8px 0 0; text-align: center; font-size: 14px; color: var(--muted); }
+.scrub-hint b { color: var(--flare); font-weight: 700; } .scrub-hint i { color: var(--remove); font-style: normal; font-weight: 700; }
+.est-total { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin: 24px 0 0; }
+.est-total .num { font-size: clamp(52px, 5.4vw, 76px); line-height: .9; }
+.est-total .how { font-size: 14px; color: var(--muted); }
+.est-book { margin-top: 22px; font: 600 15px var(--text); color: var(--ink); background: none; border: 1px solid var(--ink); border-radius: 2px;
+  min-height: 48px; padding: 0 22px; cursor: pointer; }
+.est-book:hover { background: var(--ink); color: var(--deep); }
+.est-note { margin: 14px 0 0; font-size: 13px; color: var(--muted); max-width: 30em; }
+@media (prefers-reduced-motion: no-preference) {
+  .commission.will-reveal .rate { opacity: 0; translate: 0 12px; transition: opacity .6s ease, translate .9s var(--ease-out); transition-delay: calc(var(--i) * 110ms + 120ms); }
+  .commission.will-reveal .rate::after, .commission.will-reveal .rate:first-child::before { scale: 0 1; transition: scale 1.1s var(--ease-out); transition-delay: calc(var(--i) * 110ms); }
+  .commission.is-in .rate { opacity: 1; translate: 0 0; }
+  .commission.is-in .rate::after, .commission.is-in .rate:first-child::before { scale: 1 1; }
+}
+form { display: grid; gap: 14px; grid-template-columns: 1fr 1fr; }
+form .full { grid-column: 1 / -1; }
+form label { display: grid; gap: 6px; font-size: 13px; color: var(--muted); }
+input, select, textarea { font: inherit; font-size: 16px; color: var(--ink); background: color-mix(in oklab, var(--deep) 60%, transparent);
+  border: 1px solid var(--faint); border-radius: 4px; padding: 12px 14px; width: 100%; box-sizing: border-box; min-height: 48px; }
+textarea { min-height: 120px; resize: vertical; }
+.send { justify-self: start; border: 1px solid var(--ink); background: var(--ink); color: var(--deep); padding: 14px 26px; border-radius: 2px; font-weight: 600; cursor: pointer; min-height: 48px; }
+.sent { grid-column: 1 / -1; font-size: 14px; color: var(--muted); margin: 0; }
+@media (max-width: 1100px) { .commission { grid-template-columns: minmax(0, 1fr); grid-template-areas: "intro" "rates" "est" "form"; row-gap: 48px; } } /* two columns only where the session row fits on one line */
+@media (max-width: 860px) { form { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 560px) { .est-fan { height: 230px; } .est-fan .card { width: 88px; margin-left: -44px; bottom: 52px; } }
+@media (prefers-reduced-motion: reduce) { .est-fan .card, .est-fan .card.off, .scrub .strip { transition: none; } .est-fan .card.land { animation: none; } }
+
+/* ---------- archive ---------- */
+.archive { max-width: 1500px; margin: 0 auto; padding: 0 var(--gr) 110px var(--gl); }
+.archive { scroll-margin-top: 20px; }
+.archive h2 { margin: 0 0 8px; font-family: var(--display); font-weight: 400; font-size: clamp(36px, 5vw, 64px); line-height: 1; }
+.archive > p { margin: 0 0 24px; color: var(--muted); max-width: 40em; }
+.shoots { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 14px; margin: 0 -2px 18px; scrollbar-width: thin; }
+.shoots button { flex: none; border: 1px solid var(--faint); background: none; color: var(--muted); border-radius: 999px; padding: 0 14px; min-height: 40px; font-size: 14px; cursor: pointer; white-space: nowrap; }
+.shoots button:hover { color: var(--ink); }
+.shoots button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--deep); }
+.shoots .n { margin-left: 6px; opacity: .65; font-variant-numeric: tabular-nums; }
+.archive-grid { display: flex; flex-wrap: wrap; gap: 6px; --row: 190px; }
+.archive-grid .end { flex: 999 1 0; height: 0; }   /* keeps a shoot's last row from stretching */
+.archive-grid h3 { flex: 0 0 100%; margin: 28px 0 6px; font-family: var(--display); font-weight: 400; font-size: clamp(22px, 2.4vw, 30px); line-height: 1.15; }
+.archive-grid h3:first-child { margin-top: 0; }
+.archive-grid h3 span { display: block; margin-top: 4px; font-family: var(--text); font-size: 13px; color: var(--muted); }
+.archive-grid button { all: unset; cursor: zoom-in; display: block; min-width: 0; flex: var(--ar) 1 calc(var(--ar) * var(--row)); max-width: calc(var(--ar) * var(--row) * 1.8); }
+.archive-grid button:focus-visible { outline: 2px solid var(--glow); outline-offset: 2px; }
+.archive-grid .nj-thumb { width: 100%; background: color-mix(in oklab, var(--ink) 6%, transparent); }
+@media (max-width: 520px) { .archive-grid { gap: 4px; --row: 108px; } }
+
+footer { padding: 28px var(--gr) calc(96px + env(safe-area-inset-bottom, 0px)) var(--gl); border-top: 1px solid var(--faint);
+  display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; font-size: 14px; color: var(--muted); }
+
+/* ---------- story pill + list ---------- */
+.pill { position: fixed; z-index: 15; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); translate: -50% 0;
+  display: inline-flex; align-items: center; gap: 12px; max-width: calc(100vw - 32px);
+  padding: 0 18px 0 16px; min-height: 46px; border-radius: 999px; border: 1px solid var(--faint); cursor: pointer;
+  background: color-mix(in oklab, var(--deep) 62%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  font-size: 14px; color: var(--ink); opacity: 0; pointer-events: none; transition: opacity .4s ease, translate .45s var(--ease-out); }
+.pill.is-on { opacity: 1; pointer-events: auto; }
+.is-tucked .pill { translate: -50% calc(100% + 24px); }
+.pill .ic { width: 14px; height: 10px; flex: none; background: linear-gradient(currentColor 0 0) 0 0 / 100% 1.5px no-repeat, linear-gradient(currentColor 0 0) 0 50% / 70% 1.5px no-repeat, linear-gradient(currentColor 0 0) 0 100% / 100% 1.5px no-repeat; opacity: .7; }
+.pill .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+dialog.sheet { margin: auto auto 0; width: min(100%, 560px); max-width: 100%; max-height: 80svh; box-sizing: border-box; border: 0; border-radius: 16px 16px 0 0;
+  padding: 10px var(--gr) calc(18px + env(safe-area-inset-bottom, 0px)) var(--gl); background: color-mix(in oklab, var(--base) 94%, #000); color: var(--ink); }
+dialog.sheet::backdrop { background: color-mix(in oklab, var(--deep) 60%, transparent); }
+.sheet .grab { width: 40px; height: 4px; border-radius: 2px; background: var(--faint); margin: 4px auto 14px; }
+.sheet ol { list-style: none; margin: 0; padding: 0; }
+.sheet a { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 52px; text-decoration: none; border-bottom: 1px solid var(--faint); }
+.sheet a .nm { font-family: var(--display); font-size: 22px; }
+.sheet a .wh { font-size: 13px; color: var(--muted); text-align: right; }
+.sheet a[aria-current="true"] .nm { color: var(--glow); }
+
+/* ---------- collections (home) ---------- */
+.collections { max-width: 1500px; margin: 0 auto; padding: clamp(64px, 10vh, 120px) var(--gr) clamp(48px, 8vh, 96px) var(--gl); }
+.collections h2 { margin: 0 0 28px; font-family: var(--display); font-weight: 500; font-variation-settings: "opsz" 24; font-size: clamp(36px, 5vw, 64px); line-height: 1; }
+.tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(12px, 1.6vw, 22px); }
+.tile { position: relative; display: block; aspect-ratio: 3 / 2; overflow: hidden; border-radius: 3px; text-decoration: none; background-size: cover; background-position: center; isolation: isolate;
+  box-shadow: 0 24px 60px -30px rgba(0,0,0,.8), 0 0 90px -40px var(--pglow); }
+.tile img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: scale 1.2s var(--ease-out); }
+.tile::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,.72), rgba(0,0,0,.1) 55%, transparent); }
+.tile-copy { position: absolute; z-index: 1; left: 18px; right: 18px; bottom: 16px; display: grid; gap: 2px; }
+.tile .nm { font-family: var(--display); font-weight: 500; font-variation-settings: "opsz" 24; font-size: clamp(24px, 2.4vw, 34px); line-height: 1.05; color: #fff; }
+.tile .sub { font-size: 14px; color: rgba(255,255,255,.78); }
+@media (hover: hover) { .tile:hover img { scale: 1.035; } }
+/* a vertical cover stays whole on its tile, lit by a blur of itself */
+.tile.is-tall::before { content: ""; position: absolute; inset: -12%; background: inherit; filter: blur(28px) saturate(1.2) brightness(.5); }
+.tile.is-tall img { object-fit: contain; padding: 12px 0; box-sizing: border-box; filter: drop-shadow(0 12px 24px rgba(0,0,0,.5)); }
+.tile:focus-visible { outline: 2px solid var(--glow); outline-offset: 4px; }
+@media (max-width: 1000px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .tiles { grid-template-columns: minmax(0, 1fr); } .tile { aspect-ratio: 16 / 10; } }
+@media (prefers-reduced-motion: reduce) { .tile img { transition: none; } }
+
+/* ---------- collection page ---------- */
+.cat-head { max-width: 1180px; margin: 0 auto; padding: calc(96px + env(safe-area-inset-top, 0px)) var(--gr) clamp(40px, 7vh, 72px) var(--gl); }
+.back { display: inline-block; font-size: 14px; color: var(--muted); text-decoration: none; padding: 8px 0; margin-bottom: 10px; }
+.back::before { content: "‹ "; }
+.back:hover { color: var(--ink); }
+.cat-head h1 { margin: 0; font-family: var(--display); font-weight: 500; font-variation-settings: "opsz" 24; font-size: clamp(44px, 7vw, 96px); line-height: .95; letter-spacing: -.02em; text-wrap: balance; }
+.cat-head > p { margin: 14px 0 28px; color: var(--muted); max-width: 40em; }
+.next-col { max-width: 1500px; margin: 0 auto; padding: 20px var(--gr) 80px var(--gl); display: grid; gap: 4px; }
+.next-col span { font-size: 14px; color: var(--muted); }
+.next-col a { font-family: var(--display); font-weight: 500; font-variation-settings: "opsz" 24; font-size: clamp(30px, 4vw, 52px); line-height: 1.05; text-decoration: none; width: max-content; max-width: 100%; }
+.next-col a:hover { color: var(--glow); }
+#all-archive { padding-top: calc(96px + env(safe-area-inset-top, 0px)); }
+
+/* ---------- the trail ---------- */
+.wall { position: relative; }
+.wall > .hang { position: relative; z-index: 1; }
+svg.trail { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; z-index: 0; }
+svg.trail path { fill: none; stroke-width: 2; stroke-linecap: round; stroke-dasharray: 0 10; }
+svg.trail .t-base { stroke: color-mix(in oklab, var(--ink) 9%, transparent); }
+svg.trail .t-lit { stroke: color-mix(in oklab, var(--ink) 34%, transparent); }
+</style>
+
+<header class="top">
+  <div class="top-l"><button class="top-back" id="top-back" type="button" hidden><span>Back</span></button><a class="mark" href="#home">Nathan Jones</a></div>
+  <nav class="top-links" aria-label="Site"><a class="book-link" href="#archive">Archive</a><a class="book-link" href="#book">Book<span class="long"> a session</span></a></nav>
+</header>
+
+<main>
+  <!-- home: hero, the six collections, booking -->
+  <div id="v-home" class="view">
+    <section class="hero" aria-label="Introduction">
+      <img id="hero-img" alt="" fetchpriority="high">
+      <div class="hero-copy">
+        <div>
+          <h1>Nathan Jones</h1>
+          <nav aria-label="What I shoot"><ul class="hero-cats">
+            <li><a href="#landscapes">Nature</a></li> <li><a href="#portraits">Portraits &amp; Headshots</a></li> <li><a href="#aviation">Aviation</a></li> <li><a href="#cities">Travel</a></li> <li><a href="#sports">Events</a></li>
+          </ul></nav>
+        </div>
+        <div class="label" id="hero-label"></div>
+      </div>
+    </section>
+    <section class="collections" aria-labelledby="col-h">
+      <h2 id="col-h">Collections</h2>
+      <div class="tiles" id="tiles"></div>
+    </section>
+    <div id="book-slot"></div>
+  </div>
+
+  <!-- one collection: its stories, then the rest of its photos -->
+  <div id="v-cat" class="view" hidden>
+    <section class="cat-head">
+      <a class="back" href="#home">All collections</a>
+      <h1 id="cat-h"></h1>
+      <p id="cat-p"></p>
+      <ol class="stories" id="cat-stories"></ol>
+    </section>
+    <div id="story-list"></div>
+    <section class="archive" id="cat-archive" aria-labelledby="cat-arch-h">
+      <h2 id="cat-arch-h"></h2>
+      <p class="arch-p"></p>
+      <div class="shoots" role="group" aria-label="Show one shoot"></div>
+      <div class="archive-grid"></div>
+    </section>
+    <nav class="next-col" id="next-col" aria-label="Next collection"></nav>
+  </div>
+
+  <!-- the whole archive -->
+  <div id="v-archive" class="view" hidden>
+    <section class="archive" id="all-archive" aria-labelledby="archive-h">
+      <a class="back" href="#home">All collections</a>
+      <h2 id="archive-h">Archive</h2>
+      <p class="arch-p"></p>
+      <div class="shoots" role="group" aria-label="Show one shoot"></div>
+      <div class="archive-grid"></div>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <span>© 2026 Nathan Jones Photography</span>
+  <a href="https://www.instagram.com/nathanjones.jpeg" target="_blank" rel="noopener">Instagram</a>
+</footer>
+
+<button class="pill" id="pill" aria-haspopup="dialog" aria-label="Show stories in this collection"><span class="ic"></span><span class="nm" id="pill-nm"></span></button>
+<dialog class="sheet" id="sheet" aria-label="Stories in this collection"><div class="grab"></div><ol id="sheet-list"></ol></dialog>
+
+<script src="portfolio.js"></script>
+<script src="shared/core.js"></script>
+<script>
+const { D, byId, inAlbum, src, url, thumbHTML, isPortrait, monthYear, readoutHTML, gear, setAmbient, viewer, reduced } = NJ;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const $ = s => document.querySelector(s);
+
+/* Collections: every album belongs to one. Story albums are in running order; archive-only albums follow.
+   tile: the photo Nathan chose for the collection's tile; without one, the tile uses the cover of the collection's first story. */
+const CATS = [
+  { id: 'aviation', title: 'Aviation',
+    albums: ['f22', 'pax', 'america-250-washington-dc', 'columbus', 'seafair', 'uk-engineering-takes-flight-2026', 'cape', 'uk-engineering-takes-flight-2024'] },
+  { id: 'landscapes', title: 'Landscapes & Wildlife',
+    albums: ['cr24', 'cr25', 'smokies', 'eagle', 'huntsville-ducks-spring-2026'] },
+  { id: 'cities', title: 'Cities & Night', tile: 'seattle-wa-summer-2025-ad0a8841',
+    albums: ['dc', 'seattle', 'seattle-wa-summer-2025', 'july-4th-2025-seattle-wa', 'lex', 'indianapolis-christmas-2024', 'july4'] },
+  { id: 'portraits', title: 'Portraits',
+    albums: ['jc', 'rocco', 'bella-jones-senior-pics', 'senior-photos', 'uk-engineering-headshots-2025', 'rcshs-homecoming-2024', 'christmas-2025', 'logan-jones-2010-dodge-ram-1500', 'jessica-jones-senior-prom'] },
+  { id: 'sports', title: 'Sports & Events', tile: 'ic-flag-football-10-21-2025-ad0a2424-2',
+    albums: ['ic-flag-football-10-8-2025', 'ic-flag-football-10-21-2025', 'rcshs-homecoming-football-game-2024'] },
+  { id: 'press', title: 'Press', tile: 'kentucky-kernel-ben-carson-uk-11-20-2024-ad0a5130-enhanced-nr', blurb: 'Assignments for the Kentucky Kernel.',
+    albums: ['kentucky-kernel-ben-carson-uk-11-20-2024', 'kentucky-kernel-pumpkins-and-power-tools-10-23-2024', 'kentucky-kernel-lunar-new-year-jan-31-2025', 'kentucky-kernel-chinese-new-year-feb-6-2025'] },
+];
+/* any album not listed above still shows up, in the archive */
+const listed = new Set(CATS.flatMap(c => c.albums));
+Object.keys(D.albums).filter(k => !listed.has(k) && inAlbum(k).length).forEach(k => (D.stories[k] ? CATS[0] : CATS[CATS.length - 1]).albums.push(k));
+
+/* Each story's line under its title, in Nathan's words (from the Story quotes page).
+   QUOTES are first-person and show as a quote credited to him; NOTES are plain descriptions. */
+const NOTES = {
+  "rocco": "Rocco graduated in 2026 with a B.S. in Mechanical Engineering.",
+  "bella-jones-senior-pics": "Bella graduated high school in 2026 and currently attends Indiana University Bloomington.",
+  "senior-photos": "A collection of senior pictures.",
+  "rcshs-homecoming-2024": "Jessica and Clay's senior homecoming.",
+  "ic-flag-football-10-21-2025": "Doug showing off his half-time speech abilities.",
+};
+const QUOTES = {
+  "f22": "This was my first time seeing the Raptor Demo in 10 years, and I wanted these images to speak that sense of awe and honor I have for our Air Force.",
+  "pax": "I've seen the Blue Angels every year since 2024 and this show was one of the best!",
+  "america-250-washington-dc": "I remember this special feeling of awe and patriotism seeing all these planes in the same place over our nation's capital for the 250th.",
+  "columbus": "I remember driving a total of 6 hours for this one event and it was worth it!",
+  "seafair": "I had never been this close to the Blue Angels before, truly a remarkable experience.",
+  "uk-engineering-takes-flight-2026": "I remember sitting in the cockpit for like 20 minutes and wouldn't leave until I saw a kid wanting to swap.",
+  "cape": "I remember waking up very early to see a SpaceX launch, only to find it was moved to the next day, but I was still able to be on the pier to see the amazing sunrise and birds.",
+  "cr24": "By far one of my favorite landscape shots, I am often asked if this is an Apple default wallpaper.",
+  "cr25": "I went back to Cave Run Lake with my drone to take more perspectives of the pretty trees.",
+  "smokies": "I remember pulling to the side of the road and waiting 10 minutes until the road was clear just to get this one shot.",
+  "eagle": "I was testing out a new lens, looked out into a field at my grandparents' house, and saw something fly into frame. Turns out it was a local bald eagle with a cornhusk for its nest.",
+  "huntsville-ducks-spring-2026": "After almost pulling an all-nighter working on a robot, I spent the next day relaxing, watching these graceful ducks.",
+  "dc": "I remember rushing to Gravelly Point after work, camera in hand, so I could get these amazing shots.",
+  "seattle": "I was leaving Seattle after my first summer internship, and I was looking out of my window and immediately assembled my camera to get this shot.",
+  "seattle-wa-summer-2025": "Seattle has always held a special place in my heart, and I feel this image captures the peace Seattle brings.",
+  "july-4th-2025-seattle-wa": "For these shots I remember stealing someone's spot as soon as they left, setting up my tripod, and having a great night!",
+  "lex": "One day in class I decided to just roam downtown Lexington, so that night I went on a little adventure by myself with no plan.",
+  "indianapolis-christmas-2024": "I always visit Indiana for Christmas, so these images represent family.",
+  "jc": "I remember standing 200+ feet away, ready for the surprise.",
+  "christmas-2025": "Tried out a fun sparkle lens filter for these.",
+  "logan-jones-2010-dodge-ram-1500": "My cousin, Logan, and I had a lot of fun getting these.",
+  "ic-flag-football-10-8-2025": "Gavin giving his all to score for our team.",
+  "rcshs-homecoming-football-game-2024": "It was fun to come back a year after graduating and see all the familiar faces.",
+};
+const FEATURE = { f22: ['f22-flares'], pax: ['pax-blues-diamond'], dc: ['b2'], cr24: ['caverun-canopy'], seattle: ['seattle-aerial'] };
+const SLUG = { f22: 'raptor', pax: 'pax', dc: 'washington', cr24: 'cave-run', smokies: 'smokies', seattle: 'seattle', jc: 'jessica-clay' };
+const storyOf = k => ({ id: SLUG[k] || k, album: k, cover: D.stories[k].cover, photos: D.stories[k].photos, feature: FEATURE[k] || [], note: NOTES[k] || '', quote: QUOTES[k] || '' });
+CATS.forEach(c => {
+  c.stories = c.albums.filter(k => D.stories[k]).map(storyOf);
+  c.photoCount = c.albums.reduce((n, k) => n + inAlbum(k).length, 0);
+});
+const STORY = Object.fromEntries(CATS.flatMap(c => c.stories.map(s => [s.id, { s, c }])));
+const CAT = Object.fromEntries(CATS.map(c => [c.id, c]));
+
+const capOf = p => p.caption || D.albums[p.album].title;
+const whereOf = (a, venue = true) => [a.place, venue ? a.venue : '', a.season].filter(Boolean).join(', ');
+const titleOf = s => s.title || D.albums[s.album].title;
+const plural = (n, w) => `${n} ${n === 1 ? w : (w.endsWith('y') ? w.slice(0, -1) + 'ies' : w + 's')}`;
+const labelHTML = p => { const a = D.albums[p.album]; return `<strong>${esc(capOf(p))}</strong>${esc([a.place, monthYear(p)].filter(Boolean).join(', '))}<span class="gear">${esc(gear(p))}</span><span class="nj-readout">${readoutHTML(p)}</span>`; };
+
+/* ---------- home ---------- */
+/* the portfolio's main cover: the Cave Run from Above story cover Nathan picked */
+const hero = byId[D.stories.cr24?.cover] || byId[CATS[0].stories[0].cover];
+$('#hero-img').src = src(hero);
+$('#hero-img').alt = hero.album === 'cr24' ? 'Autumn forest in full color above Cave Run Lake, with ridges and blue sky beyond, seen from a drone' : capOf(hero);
+$('#hero-label').innerHTML = labelHTML(hero);
+setAmbient(hero);
+
+$('#tiles').innerHTML = CATS.map(c => {
+  const p = byId[c.tile] || (c.stories.length ? byId[c.stories[0].cover] : inAlbum(c.albums[0])[0]);
+  const sub = c.stories.length ? `${plural(c.stories.length, 'story')}, ${c.photoCount} photos` : (c.blurb ? `${c.blurb} ${c.photoCount} photos` : `${c.photoCount} photos`);
+  return `<a class="tile${isPortrait(p) ? ' is-tall' : ''}" href="#${c.id}" style="--pglow:${p.color.glow};background-image:url(${p.lqip || ''})"><img ${p.src ? `src="${src(p)}"` : `data-pack="${p.id}"`} alt="" loading="lazy" decoding="async"><span class="tile-copy"><span class="nm">${esc(c.title)}</span><span class="sub">${esc(sub)}</span></span></a>`;
+}).join('');
+document.querySelectorAll('#tiles img[data-pack]').forEach(img => url(byId[img.dataset.pack]).then(u => { img.src = u; }));
+
+/* pricing, from nathanjonesphoto.co/pricing: per-photo sessions, or a package of edited photos plus $5 for each extra */
+const RATES = [
+  { id: 'headshots', name: 'Headshots', short: 'Headshots', price: 10, per: true, start: 3, terms: 'Usually a bundle of 3, $30' },
+  { id: 'portraits', name: 'Portraits', short: 'Portraits', price: 12.5, per: true, start: 10, terms: 'Single, couple or group, as many photos as you like' },
+  { id: 'senior', name: 'Graduation & senior', short: 'Graduation & senior', price: 150, incl: 15, terms: 'Then $5 for each extra photo' },
+  { id: 'engagement', name: 'Engagement', short: 'Engagement', price: 250, incl: 20, terms: 'Then $5 for each extra photo' },
+  { id: 'events', name: 'Events & sports', short: 'Events & sports', price: 150, incl: 15, terms: 'Then $5 for each extra photo' },
+];
+const EXTRA = 5;
+const money = v => '$' + (v % 1 ? v.toFixed(2) : v.toLocaleString('en-US'));
+const totalOf = (r, n) => r.per ? r.price * n : r.price + EXTRA * Math.max(0, n - r.incl);
+const BOOK = `
+  <section class="commission" id="book" aria-labelledby="book-h">
+    <div class="book-intro">
+      <h2 id="book-h">Book a session</h2>
+      <p>I price by the edited photo, not by the hour, so I stay until the shots are right. Tell me the date, the place and what you have in mind.</p>
+      <p class="pay">Pay by cash, check, Venmo or Apple Cash.</p>
+    </div>
+    <ul class="rates" aria-label="Pricing">${RATES.map((r, i) => `
+      <li class="rate" style="--i:${i}"><span><strong>${r.name}</strong><span class="terms">${r.terms}</span></span>
+        <span class="price"><span class="num" data-to="${r.price}">${money(r.price)}</span><span class="unit">${r.per ? 'per edited photo' : `${r.incl} edited photos`}</span></span></li>`).join('')}
+    </ul>
+    <div class="estimate" aria-labelledby="est-h">
+      <h3 id="est-h">Estimate your session</h3>
+      <div class="est-types" role="group" aria-label="Session type">${RATES.map(r => `<button type="button" data-rate="${r.id}" aria-pressed="false">${r.short}</button>`).join('')}</div>
+      <div class="est-fan" aria-hidden="true">${Array.from({ length: 40 }, (_, i) => `<div class="card off" style="z-index:${i}"><i class="ph"></i></div>`).join('')}</div>
+      <div class="scrub" id="est-scrub" role="slider" tabindex="0" aria-label="Edited photos" aria-valuemin="1" aria-valuemax="40"><div class="strip"></div><div class="win"><span id="est-out"></span></div></div>
+      <p class="scrub-hint">Pull the film, or tap <b>+ Add</b> or <i>− Remove</i></p>
+      <p class="est-total" aria-live="polite"><span class="num" id="est-total"></span><span class="how" id="est-how"></span></p>
+      <button type="button" class="est-book" id="est-book">Request this session</button>
+    </div>
+    <form id="book-form">
+      <label>Name<input id="f-name" name="name" autocomplete="name" required></label>
+      <label>Email<input id="f-email" name="email" type="email" autocomplete="email" inputmode="email" required></label>
+      <label>Session<select id="f-type" name="type">${RATES.map(r => `<option value="${r.id}">${r.name}</option>`).join('')}<option value="other">Something else</option></select></label>
+      <label>Preferred date<input id="f-date" name="date" type="date"></label>
+      <label class="full">What do you have in mind?<textarea id="f-msg" name="message" placeholder="Location ideas, number of people, the look you want"></textarea></label>
+      <button class="send" type="submit">Send request</button>
+      <p class="sent" id="sent" hidden>Prototype only: requests will be sent once the site is connected to AWS.</p>
+    </form>
+  </section>`;
+$('#book-slot').innerHTML = BOOK;
+$('#book-form').addEventListener('submit', e => { e.preventDefault(); $('#sent').hidden = false; });
+
+/* numbers glide to their new value instead of jumping */
+function tween(el, to, ms = 450, from = el._v ?? 0) {
+  el._v = to; cancelAnimationFrame(el._raf);
+  if (reduced) { el.textContent = money(to); return; }
+  const t0 = performance.now(), ease = t => 1 - Math.pow(1 - t, 3);
+  const step = now => {
+    const t = Math.min(1, (now - t0) / ms), v = from + (to - from) * ease(t);
+    el.textContent = money(t < 1 ? (to % 1 ? Math.round(v * 2) / 2 : Math.round(v)) : to);
+    if (t < 1) el._raf = requestAnimationFrame(step);
+  };
+  el._raf = requestAnimationFrame(step);
+}
+
+/* estimator: a hand of prints from that kind of session, and a film strip to choose how many */
+const EST_COUNT = { headshots: 24, portraits: 24, senior: 24, engagement: 18, events: 24 }; // photos on each est/<type>.jpg sheet
+const EST_MAX = 40, FW = 72; // frames on the film, and one frame's width plus its gap
+const est = { r: RATES[2], n: 15 };
+const estMin = r => r.per ? 1 : r.incl;
+const estPhoto = (r, i) => { const k = i % EST_COUNT[r.id];
+  return `background-image:url(est/${r.id}.jpg?v=2);background-position:${(k % 6) * 20}% ${Math.floor(k / 6) * 100 / 3}%`; };
+const estBox = $('.estimate'), fan = $('.est-fan'), cards = [...fan.children], scrub = $('#est-scrub'), strip = scrub.querySelector('.strip');
+const buzz = ms => { if (navigator.userActivation?.hasBeenActive && !reduced) try { navigator.vibrate?.(ms); } catch {} };
+let fanN = 0, landT = 0, closeT = 0, built = null;
+cards.forEach(c => c.addEventListener('animationend', e => { if (e.animationName === 'flare') c.classList.remove('land'); }));
+function setEstN(n) { n = Math.max(estMin(est.r), Math.min(EST_MAX, Math.round(n))); if (n === est.n) return false; est.n = n; drawEstimate(); buzz(6); return true; }
+function drawFan(typeChanged) {
+  const { r, n } = est, narrow = Math.min(1, fan.clientWidth / 560);
+  if (!typeChanged && n < fanN) { fan.classList.add('closing'); clearTimeout(closeT); closeT = setTimeout(() => fan.classList.remove('closing'), 900); }
+  const spread = Math.min(84, 6 + n * 3.4) * (.55 + .45 * narrow), step = n > 1 ? spread / (n - 1) : 0;
+  cards.forEach((c, i) => {
+    if (typeChanged || !c.firstChild.getAttribute('style')) c.firstChild.setAttribute('style', estPhoto(r, i));
+    const on = i < n; if (!on) c.classList.remove('land');
+    c.classList.toggle('off', !on); if (on) { c.classList.toggle('extra', !r.per && i >= r.incl); c.style.rotate = (n > 1 ? -spread / 2 + i * step : 0) + 'deg'; }
+  });
+  if (!typeChanged && n > fanN) { // new prints drop onto the pile, then it thuds and the panel shakes once
+    const fresh = cards.slice(fanN, n).slice(-8);
+    fresh.forEach((c, k) => { c.classList.remove('land'); c.style.setProperty('--d', k * 70 + 'ms'); void c.offsetWidth; c.classList.add('land'); });
+    if (!reduced) { clearTimeout(landT); landT = setTimeout(() => {
+      fan.classList.remove('thud'); estBox.classList.remove('shake'); void fan.offsetWidth; fan.classList.add('thud'); estBox.classList.add('shake'); buzz(12);
+    }, (fresh.length - 1) * 70 + 380); }
+  }
+  fanN = n;
+}
+function drawFilm(typeChanged) {
+  const { r, n } = est;
+  if (typeChanged || built !== r.id) { built = r.id; strip.innerHTML = Array.from({ length: EST_MAX }, (_, i) => `<div class="fr"><i class="ph" style="${estPhoto(r, i)}"></i></div>`).join(''); }
+  [...strip.children].forEach((f, i) => { f.classList.toggle('on', i < n); f.classList.toggle('extra', !r.per && i < n && i >= r.incl);
+    f.classList.toggle('next', i === n); f.classList.toggle('prev', i === n - 2 && n > estMin(r)); });
+  if (!scrub.classList.contains('dragging')) strip.style.translate = `${-(n - 1) * FW - 33}px 0`;
+  $('#est-out').textContent = `${n} ${n === 1 ? 'photo' : 'photos'}`;
+  scrub.setAttribute('aria-valuemin', estMin(r)); scrub.setAttribute('aria-valuenow', n); scrub.setAttribute('aria-valuetext', `${n} photos, ${money(totalOf(r, n))}`);
+}
+/* the film: pull to scrub, tap a frame (+ Add, − Remove, or any other) to jump to it, arrow keys for one at a time */
+let pull = null;
+scrub.addEventListener('dragstart', e => e.preventDefault());
+scrub.addEventListener('pointerdown', e => { pull = { x: e.clientX, n: est.n, fr: e.target.closest('.fr') }; scrub.setPointerCapture(e.pointerId); scrub.classList.add('dragging'); });
+scrub.addEventListener('pointermove', e => {
+  if (!pull) return;
+  const p = pull.n - (e.clientX - pull.x) / FW;
+  strip.style.translate = `${-(Math.max(estMin(est.r), Math.min(EST_MAX, p)) - 1) * FW - 33}px 0`;
+  setEstN(p);
+});
+const endPull = e => {
+  if (!pull) return; const t = pull; pull = null; scrub.classList.remove('dragging');
+  if (t.fr && Math.abs((e?.clientX ?? t.x) - t.x) < 5) setEstN([...strip.children].indexOf(t.fr) + 1);
+  drawFilm(false);
+};
+scrub.addEventListener('pointerup', endPull); scrub.addEventListener('pointercancel', endPull);
+scrub.addEventListener('keydown', e => {
+  const d = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1, PageUp: 5, PageDown: -5 }[e.key];
+  if (d) { e.preventDefault(); setEstN(est.n + d); }
+  else if (e.key === 'Home') { e.preventDefault(); setEstN(estMin(est.r)); } else if (e.key === 'End') { e.preventDefault(); setEstN(EST_MAX); }
+});
+function drawEstimate(animate = true, typeChanged = false) {
+  const { r, n } = est;
+  drawFan(typeChanged); drawFilm(typeChanged);
+  const total = totalOf(r, n), el = $('#est-total');
+  animate ? tween(el, total) : (el._v = total, el.textContent = money(total));
+  $('#est-how').textContent = r.per ? `${n} ${n === 1 ? 'photo' : 'photos'} at ${money(r.price)} each`
+    : n > r.incl ? `${r.incl} included, plus ${n - r.incl} at ${money(EXTRA)} each` : `${r.incl} edited photos included`;
+  document.querySelectorAll('.est-types button').forEach(b => b.setAttribute('aria-pressed', b.dataset.rate === r.id));
+}
+$('.est-types').addEventListener('click', e => {
+  const b = e.target.closest('[data-rate]'); if (!b) return;
+  est.r = RATES.find(r => r.id === b.dataset.rate); est.n = est.r.per ? est.r.start : est.r.incl; drawEstimate(true, true);
+});
+addEventListener('resize', () => drawFan(true));
+$('#est-book').addEventListener('click', () => {
+  $('#f-type').value = est.r.id;
+  const msg = $('#f-msg');
+  if (!msg.value.trim()) msg.value = `About ${est.n} edited photos (estimate ${money(totalOf(est.r, est.n))}).`;
+  $('#f-name').focus({ preventScroll: true }); $('#book-form').scrollIntoView({ block: 'center' });
+});
+drawEstimate(false, true);
+
+/* the one reveal: rules draw across and prices count up from zero */
+(() => {
+  const sec = $('#book');
+  if (reduced || !('IntersectionObserver' in window)) return;
+  sec.classList.add('will-reveal');
+  const nums = [...sec.querySelectorAll('.rate .num')];
+  nums.forEach(n => { n._v = 0; n.textContent = money(0); });
+  const total = $('#est-total'); const tv = total._v; total._v = 0; total.textContent = money(0);
+  const seen = new IntersectionObserver(([en]) => {
+    if (!en.isIntersecting) return;
+    seen.disconnect(); sec.classList.add('is-in');
+    nums.forEach((n, i) => setTimeout(() => tween(n, +n.dataset.to, 1100, 0), 200 + i * 110));
+    setTimeout(() => tween(total, tv, 1100, 0), 700);
+    setTimeout(() => sec.classList.add('is-settled'), 1800);
+  }, { threshold: .25 });
+  seen.observe(sec);
+})();
+
+/* ---------- a story: opener, then the wall ---------- */
+function hangPlan(s) {
+  const out = []; let flip = false;
+  for (let i = 0; i < s.photos.length; i++) {
+    const p = byId[s.photos[i]], n = byId[s.photos[i + 1]];
+    if (isPortrait(p) && n && isPortrait(n)) { out.push({ type: 'pair', ps: [p, n] }); i++; continue; }
+    out.push({ type: isPortrait(p) ? 'tall' : (s.feature.includes(p.id) ? 'land feature' : 'land'), ps: [p], flip }); flip = !flip;
+  }
+  return out;
+}
+const printBtn = (p, s, all) => `<button class="print" data-story-id="${s.id}" data-i="${all.indexOf(p.id)}" data-photo="${p.id}" style="--pglow:${p.color.glow}" aria-label="Open ${esc(capOf(p))}">
+  <img src="${src(p)}" alt="${esc(capOf(p))}" width="${p.w}" height="${p.h}" loading="lazy" decoding="async" style="background-image:url(${p.lqip});--ar:${(p.w / p.h).toFixed(4)}"></button>`;
+const LOW_COPY = new Set(['raptor']); // stories whose opener copy sits lower so it clears the subject
+function storyHTML(s, si) {
+  const a = D.albums[s.album], cover = byId[s.cover], all = [s.cover, ...s.photos];
+  const hangs = hangPlan(s).map(h => {
+    if (h.type === 'pair') return `<div class="hang pair">${h.ps.map(p => `<figure>${printBtn(p, s, all)}<figcaption class="label">${labelHTML(p)}</figcaption></figure>`).join('')}</div>`;
+    const p = h.ps[0];
+    return `<figure class="hang ${h.type}${h.flip ? ' flip' : ''}">${printBtn(p, s, all)}<figcaption class="label">${labelHTML(p)}</figcaption></figure>`;
+  }).join('');
+  return `
+  <article class="story" id="${s.id}" data-story="${si}" aria-labelledby="${s.id}-h">
+    <div class="opener">
+      <div class="opener-pin${isPortrait(cover) ? ' is-tall' : ''}" data-story-id="${s.id}" data-i="0" data-photo="${cover.id}" role="button" tabindex="0" aria-label="Open ${esc(capOf(cover))}" style="background:url(${cover.lqip}) center/cover;--ar:${(cover.w / cover.h).toFixed(3)}">
+        <img src="${src(cover)}" alt="${esc(capOf(cover))}" loading="lazy" decoding="async">
+        <div class="opener-copy${LOW_COPY.has(s.id) ? ' is-low' : ''}">
+          <h2 id="${s.id}-h">${esc(titleOf(s))}</h2>
+          <div class="where">${esc(whereOf(a))}</div>
+          ${s.quote ? `<figure class="note quote"><blockquote>“${esc(s.quote)}”</blockquote><figcaption>Nathan Jones</figcaption></figure>`
+            : s.note ? `<p class="note">${esc(s.note)}</p>` : ''}
+        </div>
+      </div>
+    </div>
+    <div class="wall">${hangs}</div>
+  </article>`;
+}
+
+/* ---------- the trail: a faint dotted line that runs behind the prints and fills in as you scroll ---------- */
+const SVGNS = 'http://www.w3.org/2000/svg';
+function smooth(pts) {
+  let d = `M${pts[0].x},${pts[0].y}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
+    d += ` C${p1.x + (p2.x - p0.x) / 6},${p1.y + (p2.y - p0.y) / 6} ${p2.x - (p3.x - p1.x) / 6},${p2.y - (p3.y - p1.y) / 6} ${p2.x},${p2.y}`;
+  }
+  return d;
+}
+/* story titles: if a wrapped title would leave one word alone on its last line, shrink it a little until it doesn't */
+function titleLines(el) {
+  const tops = [];
+  const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT); let n;
+  while ((n = w.nextNode())) for (const m of n.data.matchAll(/\S+/g)) {
+    const r = document.createRange(); r.setStart(n, m.index); r.setEnd(n, m.index + m[0].length);
+    const b = r.getClientRects()[0]; if (b) tops.push(Math.round(b.top));
+  }
+  const rows = []; tops.forEach(t => { const L = rows.find(l => Math.abs(l.t - t) < 4); L ? L.n++ : rows.push({ t, n: 1 }); });
+  return rows;
+}
+function fitTitles() {
+  document.querySelectorAll('#v-cat .opener h2').forEach(h => {
+    h.style.fontSize = '';
+    const base = parseFloat(getComputedStyle(h).fontSize);
+    for (let s = base; s >= base * .6; s -= base * .04) {
+      h.style.fontSize = s + 'px';
+      const L = titleLines(h);
+      if (L.length < 2 || L.at(-1).n > 1) return;
+    }
+    h.style.fontSize = '';
+  });
+}
+function drawTrails() {
+  fitTitles(); // titles first: the trail is measured after layout settles
+  document.querySelectorAll('#v-cat .wall').forEach((wall, n) => {
+    wall.querySelector(':scope > svg.trail')?.remove();
+    const W = wall.getBoundingClientRect(), imgs = [...wall.querySelectorAll('.print img')];
+    if (!imgs.length) return;
+    const narrow = innerWidth <= 760;
+    // wide screens: through the middle of each print (hidden behind it, seen only between prints); phones: down the left margin
+    const pts = narrow
+      ? [{ x: 7, y: 0 }, { x: 7, y: imgs.at(-1).getBoundingClientRect().bottom - W.top }]
+      : [{ x: W.width / 2, y: 0 }, ...imgs.map(i => { const r = i.getBoundingClientRect(); return { x: r.left + r.width / 2 - W.left, y: r.top + r.height / 2 - W.top }; })];
+    const d = smooth(pts), id = `trail-clip-${n}`;
+    const svg = document.createElementNS(SVGNS, 'svg');
+    svg.setAttribute('class', 'trail'); svg.setAttribute('aria-hidden', 'true');
+    svg.innerHTML = `<defs><clipPath id="${id}"><rect x="-50" y="0" width="200%" height="0"/></clipPath></defs>
+      <path d="${d}" class="t-base"/><path d="${d}" class="t-lit" clip-path="url(#${id})"/>`;
+    wall.prepend(svg);
+  });
+  fillTrails();
+}
+function fillTrails() {
+  const reach = innerHeight * .65;
+  document.querySelectorAll('#v-cat .wall > svg.trail rect').forEach(r => {
+    const top = r.closest('.wall').getBoundingClientRect().top;
+    r.setAttribute('height', reduced ? 1e6 : Math.max(0, reach - top));
+  });
+}
+
+/* ---------- archive grids (whole archive, or one collection's albums) ---------- */
+function archive(root, keys, intro) {
+  root.querySelector('.arch-p').textContent = intro;
+  const chips = root.querySelector('.shoots'), grid = root.querySelector('.archive-grid');
+  const total = keys.reduce((n, k) => n + inAlbum(k).length, 0);
+  chips.innerHTML = `<button type="button" data-shoot="" aria-pressed="true">All<span class="n">${total}</span></button>`
+    + keys.map(k => `<button type="button" data-shoot="${k}" aria-pressed="false">${esc(D.albums[k].title)}<span class="n">${inAlbum(k).length}</span></button>`).join('');
+  const show = only => {
+    grid.innerHTML = (only ? [only] : keys).map(k => {
+      const a = D.albums[k], ps = inAlbum(k);
+      return `<h3>${esc(a.title)}<span>${esc(whereOf(a))}</span></h3>` + ps.map((p, i) =>
+        `<button type="button" data-arch="${k}" data-i="${i}" style="--ar:${(p.w / p.h).toFixed(4)}" aria-label="${esc(capOf(p))}, photo ${i + 1} of ${ps.length}">${thumbHTML(p)}</button>`).join('') + '<span class="end"></span>';
+    }).join('');
+    chips.querySelectorAll('[data-shoot]').forEach(b => b.setAttribute('aria-pressed', b.dataset.shoot === only));
+  };
+  chips.onclick = e => { const b = e.target.closest('[data-shoot]'); if (b) show(b.dataset.shoot); };
+  show('');
+}
+const allKeys = CATS.flatMap(c => c.albums).filter(k => inAlbum(k).length);
+archive($('#all-archive'), allKeys, `Every photo from every shoot, ${D.photos.length} in all. Tap a photo to see it full screen.`);
+
+/* ---------- views ---------- */
+let cat = null;
+const pill = $('#pill'), sheet = $('#sheet');
+function showCollection(c) {
+  if (cat === c) return;
+  cat = c;
+  $('#cat-h').textContent = c.title;
+  $('#cat-p').textContent = c.stories.length ? `${plural(c.stories.length, 'story')} and ${c.photoCount} photos. Tap any photo to see it full screen.` : `${c.blurb || ''} ${c.photoCount} photos.`.trim();
+  $('#cat-stories').innerHTML = c.stories.map(s => `<li><a href="#${s.id}"><span class="nm">${esc(titleOf(s))}</span><span class="wh">${esc(whereOf(D.albums[s.album], false))}</span>${thumbHTML(byId[s.cover], { square: true })}</a></li>`).join('');
+  $('#cat-stories').hidden = !c.stories.length;
+  $('#story-list').innerHTML = c.stories.map(storyHTML).join('');
+  const arch = $('#cat-archive');
+  arch.querySelector('h2').textContent = c.stories.length ? `More from ${c.title}` : 'All photos';
+  archive(arch, c.albums.filter(k => inAlbum(k).length), c.stories.length ? 'Every photo from these shoots, including the ones in the stories above.' : 'Tap a photo to see it full screen.');
+  const next = CATS[(CATS.indexOf(c) + 1) % CATS.length];
+  $('#next-col').innerHTML = `<span>Next collection</span><a href="#${next.id}">${esc(next.title)}</a>`;
+  $('#sheet-list').innerHTML = c.stories.map((s, i) => `<li><a href="#${s.id}" data-story="${i}"><span class="nm">${esc(titleOf(s))}</span><span class="wh">${esc(D.albums[s.album].place)}</span></a></li>`).join('')
+    + `<li><a href="#home"><span class="nm">All collections</span><span class="wh"></span></a></li>`;
+  watch();
+  requestAnimationFrame(drawTrails);
+}
+function show(view) {
+  document.querySelectorAll('.view').forEach(v => { v.hidden = v.id !== view; });
+  if (view !== 'v-cat') { pill.classList.remove('is-on'); }
+}
+/* back: a trail of the screens you came through, and how far down each one you were */
+const trail = [], scrolls = {}, here = () => decodeURIComponent(location.hash.slice(1)) || 'home';
+let at = here(), restoring = false, leaving = false;
+const backBtn = $('#top-back');
+/* note the spot the moment a link is followed, before the jump to the next screen can overwrite it */
+document.addEventListener('click', e => {
+  const l = e.target.closest('a[href^="#"], #top-back');
+  if (l && (l === backBtn || decodeURIComponent(l.getAttribute('href').slice(1)) !== at)) { scrolls[at] = scrollY; leaving = true; }
+}, true);
+function setBack(h) { // home is the root, so it never shows Back
+  backBtn.hidden = h === 'home' || h === 'book';
+  backBtn.setAttribute('aria-label', 'Back to ' + label(trail.at(-1) ?? 'home'));
+}
+const label = h => CAT[h]?.title ?? (STORY[h] ? titleOf(STORY[h].s) : h === 'archive' ? 'the archive' : 'the home page');
+let fresh = false; // landed here from a shared link: Back goes home without leaving a trail behind
+backBtn.addEventListener('click', () => { if (!trail.length) fresh = true; location.hash = trail.at(-1) ?? 'home'; });
+function route() {
+  const h = decodeURIComponent(location.hash.slice(1));
+  const now = h || 'home';
+  leaving = false;
+  if (now !== at) {
+    if (trail.at(-1) === now) { trail.pop(); restoring = true; } // our Back button or the browser's
+    else if (fresh) { fresh = false; }
+    else { trail.push(at); restoring = false; }
+    at = now;
+  }
+  let target = null;
+  if (CAT[h]) { show('v-cat'); showCollection(CAT[h]); requestAnimationFrame(drawTrails); }
+  else if (STORY[h]) { show('v-cat'); showCollection(STORY[h].c); target = document.getElementById(h); }
+  else if (h === 'archive') { show('v-archive'); }
+  else { show('v-home'); if (h === 'book') target = $('#book'); setAmbient(hero); }
+  document.documentElement.classList.remove('is-tucked');
+  const y = restoring ? scrolls[now] : undefined; restoring = false;
+  if (y !== undefined) requestAnimationFrame(() => scrollTo({ top: y, behavior: 'instant' }));
+  else if (target) target.scrollIntoView(); else scrollTo(0, 0);
+  setBack(now);
+  if (h && !target && !CAT[h] && h !== 'archive' && h !== 'home') history.replaceState(null, '', '#home');
+}
+addEventListener('hashchange', route);
+
+/* ---------- viewer ---------- */
+const storyPhotos = id => { const { s } = STORY[id]; return [s.cover, ...s.photos].map(x => byId[x]); };
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-story-id]');
+  if (t) return viewer.open(storyPhotos(t.dataset.storyId), +t.dataset.i, t.querySelector('img'));
+  const ar = e.target.closest('[data-arch]');
+  if (ar) viewer.open(inAlbum(ar.dataset.arch), +ar.dataset.i, ar.querySelector('.nj-thumb'));
+});
+document.addEventListener('keydown', e => {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('.opener-pin')) { e.preventDefault(); e.target.click(); }
+});
+
+/* ---------- ambient light + story pill ---------- */
+const io = new IntersectionObserver(es => es.forEach(en => { if (en.isIntersecting) setAmbient(byId[en.target.dataset.photo]); }), { rootMargin: '-45% 0px -45% 0px' });
+const heroIO = new IntersectionObserver(([en]) => { if (en.isIntersecting) setAmbient(hero); }, { rootMargin: '-45% 0px -45% 0px' });
+heroIO.observe($('.hero'));
+let current = -1;
+function markStory(i) {
+  current = i;
+  pill.classList.toggle('is-on', i >= 0);
+  sheet.querySelectorAll('[data-story]').forEach(el => el.setAttribute('aria-current', +el.dataset.story === i));
+  if (i >= 0) { $('#pill-nm').textContent = titleOf(cat.stories[i]); pill.setAttribute('aria-label', `${titleOf(cat.stories[i])}. Show stories in ${cat.title}`); }
+}
+const storyIO = new IntersectionObserver(es => {
+  es.forEach(en => { if (en.isIntersecting) markStory(+en.target.dataset.story); else if (+en.target.dataset.story === current) markStory(-1); });
+}, { rootMargin: '-50% 0px -50% 0px' });
+function watch() {
+  io.disconnect(); storyIO.disconnect(); markStory(-1);
+  document.querySelectorAll('#v-cat [data-photo]').forEach(el => io.observe(el));
+  document.querySelectorAll('#v-cat article.story').forEach(el => storyIO.observe(el));
+}
+pill.addEventListener('click', () => sheet.showModal());
+sheet.addEventListener('click', e => { if (e.target === sheet || e.target.closest('a')) sheet.close(); });
+
+/* top bar and pill tuck away while scrolling down; the trail fills in */
+let lastY = scrollY, tucked = false, raf = 0;
+addEventListener('scroll', () => {
+  if (!raf) raf = requestAnimationFrame(() => { raf = 0; if (cat && !$('#v-cat').hidden) fillTrails(); });
+  const y = scrollY, dy = y - lastY;
+  if (!leaving) scrolls[at] = y;
+  document.documentElement.classList.toggle('is-scrolled', y > 24);
+  if (Math.abs(dy) < 6) return;
+  const t = dy > 0 && y > 160;
+  if (t !== tucked) { tucked = t; document.documentElement.classList.toggle('is-tucked', t); }
+  lastY = y;
+}, { passive: true });
+let rt = 0;
+addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { if (cat) drawTrails(); }, 150); });
+document.fonts?.ready.then(() => { if (cat) drawTrails(); });
+
+route();
+</script>
