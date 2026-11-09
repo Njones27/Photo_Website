@@ -58,4 +58,6 @@ export interface ApiRequest {
   now: Date;
   env: Env;
   mailer: () => Mailer;
+  /** One JSON log line at info or warn level. Errors go through the handler's catch, which the alarm counts. */
+  log: (level: 'info' | 'warn', message: string, detail?: Record<string, unknown>) => void;
 }

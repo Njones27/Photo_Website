@@ -84,22 +84,62 @@ export function bookingEmail(booking: Booking, stage: string): { subject: string
   };
 }
 
-/** `POST /api/booking`: emails the request to the AWS account's own address, with the visitor as Reply-To. */
-export async function createBooking({ body, env, now, mailer }: ApiRequest): Promise<Reply> {
+/**
+ * The visitor's copy. It repeats only values the form picked from a list (session and date), never the name or the
+ * message, so nobody can use the form to send their own text to someone else's inbox.
+ */
+export function confirmationEmail(booking: Booking, stage: string): { subject: string; text: string } {
+  const tag = stage && stage !== 'prod' ? `[${stage}] ` : '';
+  return {
+    subject: `${tag}Your booking request with Nathan Jones Photography`,
+    text: [
+      'Hi,',
+      '',
+      'Thanks for your booking request. It reached me, and I will reply by email soon to talk through the details.',
+      '',
+      `Session: ${SESSION_TYPES[booking.type]}`,
+      `Preferred date: ${booking.date || 'not given'}`,
+      '',
+      'If you want to add anything, just reply to this email.',
+      '',
+      'Nathan Jones',
+      '',
+      'You are getting this because this address was entered on the booking form at nathanjonesphoto.co. '
+        + 'If that was not you, you can ignore it.',
+    ].join('\n'),
+  };
+}
+
+/**
+ * `POST /api/booking`: emails the request to the AWS account's own address with the visitor as Reply-To, then sends
+ * the visitor a confirmation. A failed confirmation is logged as a warning and does not fail the request, because
+ * Nathan already has it (and SES in sandbox mode refuses unverified recipients, so beta usually can't send it).
+ */
+export async function createBooking({ body, env, now, mailer, log }: ApiRequest): Promise<Reply> {
   const parsed = parseBooking(body, now);
-  if (!parsed.ok) return parsed.reply;
-  if (parsed.spam) return json(202, { ok: true });
+  if (!parsed.ok) {
+    log('info', 'Booking rejected', { status: parsed.reply.statusCode, field: JSON.parse(parsed.reply.body).field });
+    return parsed.reply;
+  }
+  if (parsed.spam) {
+    log('info', 'Booking dropped by the spam trap');
+    return json(202, { ok: true });
+  }
 
-  const to = env.BOOKING_EMAIL ?? '';
-  if (!EMAIL.test(to)) throw new Error('BOOKING_EMAIL is not set to an email address');
+  const owner = env.BOOKING_EMAIL ?? '';
+  if (!EMAIL.test(owner)) throw new Error('BOOKING_EMAIL is not set to an email address');
+  const stage = env.STAGE ?? '';
+  const { booking } = parsed;
+  const from = `Nathan Jones Photography <${owner}>`;
 
-  const { subject, text: emailText } = bookingEmail(parsed.booking, env.STAGE ?? '');
-  await mailer().send({
-    from: `Nathan Jones Photography <${to}>`,
-    to,
-    replyTo: parsed.booking.email,
-    subject,
-    text: emailText,
-  });
+  await mailer().send({ from, to: owner, replyTo: booking.email, ...bookingEmail(booking, stage) });
+  log('info', 'Booking sent', { type: booking.type });
+
+  try {
+    await mailer().send({ from, to: booking.email, replyTo: owner, ...confirmationEmail(booking, stage) });
+    log('info', 'Confirmation sent');
+  } catch (err) {
+    log('warn', 'Confirmation not sent', { error: err instanceof Error ? err.message : String(err) });
+  }
   return json(202, { ok: true });
 }

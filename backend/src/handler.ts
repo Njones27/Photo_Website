@@ -28,6 +28,8 @@ export interface Deps {
   now?: () => Date;
   /** Where unexpected errors go. Defaults to one JSON line on stderr (CloudWatch Logs). */
   logError?: (message: string, detail: Record<string, unknown>) => void;
+  /** Where routine outcomes go (info and warn). Defaults to one JSON line on stdout. */
+  log?: ApiRequest['log'];
 }
 
 export type Handler = (event: APIGatewayProxyEventV2) => Promise<Reply>;
@@ -35,6 +37,9 @@ export type Handler = (event: APIGatewayProxyEventV2) => Promise<Reply>;
 const defaultLogError: NonNullable<Deps['logError']> = (message, detail) =>
   // Lambda's JSON log format nests this object under the record, so the Ops metric filter can match on level.
   console.error({ level: 'error', message, ...detail });
+
+const defaultLog: ApiRequest['log'] = (level, message, detail = {}) =>
+  (level === 'warn' ? console.warn : console.log)({ level, message, ...detail });
 
 const lowerCaseKeys = (headers: APIGatewayProxyEventV2['headers'] | undefined): Record<string, string> =>
   Object.fromEntries(
@@ -56,6 +61,7 @@ export function createHandler(deps: Deps = {}): Handler {
   const env: Env = deps.env ?? process.env;
   const now = deps.now ?? (() => new Date());
   const logError = deps.logError ?? defaultLogError;
+  const log = deps.log ?? defaultLog;
   let mailer = deps.mailer;
   const getMailer = (): Mailer => (mailer ??= new SesMailer());
 
@@ -88,7 +94,11 @@ export function createHandler(deps: Deps = {}): Handler {
 
       for (const route of ROUTES) {
         if (route.method !== method || !route.path.test(path)) continue;
-        return await route.run({ body, headers, now: now(), env, mailer: getMailer });
+        const requestId = event.requestContext?.requestId;
+        return await route.run({
+          body, headers, now: now(), env, mailer: getMailer,
+          log: (level, message, detail) => log(level, message, { route: `${method} ${path}`, requestId, ...detail }),
+        });
       }
       return fail('not_found', MESSAGES.notFound);
     } catch (err) {

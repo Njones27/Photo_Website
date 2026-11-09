@@ -44,6 +44,7 @@ img { max-width: 100%; }
   border: 1px solid var(--faint); background: none; color: var(--ink); font: 500 14px var(--text); cursor: pointer; white-space: nowrap; }
 .top-back::before { content: ""; width: 7px; height: 7px; border: solid currentColor; border-width: 0 0 1.5px 1.5px; rotate: 45deg; margin-left: 4px; }
 .top-back:hover { border-color: var(--ink); }
+.top-back[hidden] { display: none; }
 .top-back:focus-visible { outline: 2px solid var(--glow); outline-offset: 2px; }
 @media (max-width: 560px) { /* phones: the arrow alone, so the name and links still fit on one row */
   .top-back { width: 40px; padding: 0; justify-content: center; }
@@ -293,6 +294,7 @@ textarea { min-height: 120px; resize: vertical; }
 .send { justify-self: start; border: 1px solid var(--ink); background: var(--ink); color: var(--deep); padding: 14px 26px; border-radius: 2px; font-weight: 600; cursor: pointer; min-height: 48px; }
 .sent { grid-column: 1 / -1; font-size: 14px; color: var(--muted); margin: 0; }
 .sent.is-bad { color: var(--ink); }
+.form-note { grid-column: 1 / -1; font-size: 13px; color: var(--muted); margin: 0; }
 .send:disabled { opacity: .6; cursor: progress; }
 .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; } /* spam trap: people never see it */
 @media (max-width: 1100px) { .commission { grid-template-columns: minmax(0, 1fr); grid-template-areas: "intro" "rates" "est" "form"; row-gap: 48px; } } /* two columns only where the session row fits on one line */
@@ -581,6 +583,7 @@ const BOOK = `
       <label>Preferred date<input id="f-date" name="date" type="date"></label>
       <label class="full">What do you have in mind?<textarea id="f-msg" name="message" maxlength="4000" placeholder="Location ideas, number of people, the look you want"></textarea></label>
       <label class="hp" aria-hidden="true">Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label>
+      <p class="form-note">You'll get a confirmation email right away. If it isn't in your inbox within a few minutes, check your junk or spam folder.</p>
       <button class="send" type="submit" id="send">Send request</button>
       <p class="sent" id="sent" role="status" aria-live="polite" hidden></p>
     </form>
@@ -601,7 +604,7 @@ $('#book-form').addEventListener('submit', async e => {
     const out = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(out.message || "Your request didn't go through. Please try again in a minute.");
     form.reset();
-    say("Thanks! Your request is on its way, and I'll reply by email soon.");
+    say("Thanks! Your request is on its way, and a confirmation is headed to your inbox. If you don't see it, check your junk folder.");
   } catch (err) {
     say(err instanceof TypeError ? "Your request didn't go through. Check your connection and try again." : err.message, true);
   } finally {
