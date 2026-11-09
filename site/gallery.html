@@ -648,7 +648,8 @@ scrub.addEventListener('pointermove', e => {
 });
 const endPull = e => {
   if (!pull) return; const t = pull; pull = null; scrub.classList.remove('dragging');
-  if (t.fr && Math.abs((e?.clientX ?? t.x) - t.x) < 5) setEstN([...strip.children].indexOf(t.fr) + 1);
+  // only a real release is a tap; a cancel (the browser taking over to scroll the page) never changes the count
+  if (e.type === 'pointerup' && t.fr && Math.abs(e.clientX - t.x) < 5) setEstN([...strip.children].indexOf(t.fr) + 1);
   drawFilm(false);
 };
 scrub.addEventListener('pointerup', endPull); scrub.addEventListener('pointercancel', endPull);
@@ -665,12 +666,14 @@ function drawEstimate(animate = true, typeChanged = false) {
   $('#est-how').textContent = r.per ? `${n} ${n === 1 ? 'photo' : 'photos'} at ${money(r.price)} each`
     : n > r.incl ? `${r.incl} included, plus ${n - r.incl} at ${money(EXTRA)} each` : `${r.incl} edited photos included`;
   document.querySelectorAll('.est-types button').forEach(b => b.setAttribute('aria-pressed', b.dataset.rate === r.id));
+  if (typeChanged) $('#f-type').value = r.id; // the request form follows the session being priced
 }
 $('.est-types').addEventListener('click', e => {
   const b = e.target.closest('[data-rate]'); if (!b) return;
   est.r = RATES.find(r => r.id === b.dataset.rate); est.n = est.r.per ? est.r.start : est.r.incl; drawEstimate(true, true);
 });
-addEventListener('resize', () => drawFan(true));
+let fanRT = 0; // re-spread the hand once resizing settles (phones fire resize as the toolbar collapses)
+addEventListener('resize', () => { clearTimeout(fanRT); fanRT = setTimeout(() => drawFan(true), 150); });
 $('#est-book').addEventListener('click', () => {
   $('#f-type').value = est.r.id;
   const msg = $('#f-msg');

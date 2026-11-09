@@ -107,7 +107,7 @@ def main():
     for alb, m in PICKS.items():
         files = sorted(f for f in os.listdir(os.path.join(SRC, DIRS[alb])) if f.lower().endswith((".jpg", ".jpeg")))
         st, ar = set(m.get("story", [])), set(m.get("archive", []))
-        cover = m.get("cover") or (sorted(st)[0] if st else None)   # same rule as the stories block below
+        cover = m.get("cover") if m.get("cover") in st else (sorted(st)[0] if st else None)   # same rule as the stories block below
         jobs += [(alb, f, f in st, f in st and f == cover) for f in files if f in st or f in ar]
     with Pool(8) as pool: res = pool.map(photo_job, jobs, chunksize=4)
     photos = [r[0] for r in res]
@@ -150,7 +150,10 @@ def main():
     for alb, m in PICKS.items():
         st = [byfile[(alb, f)] for f in sorted(m.get("story", [])) if (alb, f) in byfile]
         if not st: continue
-        cover = byfile.get((alb, m.get("cover"))) if m.get("cover") else None
+        # a cover must be one of the story photos: only those get their own full-size file
+        if m.get("cover") and m["cover"] not in m.get("story", []):
+            print(f"warning: {alb} cover {m['cover']} is not a story photo; using the first story photo instead")
+        cover = byfile.get((alb, m["cover"])) if m.get("cover") in m.get("story", []) else None
         stories[alb] = dict(cover=cover or st[0], photos=[x for x in st if x != (cover or st[0])], coverPicked=bool(cover))
     data = dict(albums=albums, photos=photos, packs=packs, sheets=sheets, stories=stories, thumbCell=THUMB)
     open(os.path.join(OUT, "portfolio.js"), "w").write("window.PORTFOLIO = " + json.dumps(data, separators=(",", ":")) + ";\n")

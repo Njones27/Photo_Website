@@ -1,26 +1,40 @@
-/* Shared site code: data helpers, ambient light, full-screen viewer. Needs photos.js first. */
+/* Shared site code: data helpers, ambient light, full-screen viewer. Needs portfolio.js (window.PORTFOLIO) first. */
 (() => {
   const D = window.PORTFOLIO;
   const byId = Object.fromEntries(D.photos.map(p => [p.id, p]));
   const inAlbum = a => D.photos.filter(p => p.album === a);
   // story photos have their own file (p.src); archive-only photos live four to a file (p.pack) and are cut out on demand
   const src = (p, size = 'lg') => p.src || (p.pack ? '' : `assets/${p.id}-${size}.jpg`);
-  const packImg = new Map(), cut = new Map();
+  // packImg: pack number -> Promise<Image>; cut: photo id -> Promise<blob URL> (stored while in flight, so
+  // two callers asking for the same photo share one cut-out); made: photo id -> finished blob URL
+  const packImg = new Map(), cut = new Map(), made = new Map();
   const loadPack = n => {
-    if (!packImg.has(n)) packImg.set(n, new Promise((ok, bad) => { const im = new Image(); im.onload = () => ok(im); im.onerror = bad; im.src = D.packs[n]; }));
+    if (!packImg.has(n)) packImg.set(n, new Promise((ok, bad) => { const im = new Image(); im.onload = () => ok(im); im.onerror = bad; im.src = D.packs[n]; })
+      .catch(e => { packImg.delete(n); throw e; }));   // a failed download is retried next time, not cached
     return packImg.get(n);
   };
-  async function url(p) {
-    if (!p.pack) return src(p);
-    if (cut.has(p.id)) return cut.get(p.id);
+  // a cut-out is still in use while an image or the viewer's light spill shows it
+  const inUse = u => !!document.querySelector(`img[src="${u}"], [style*="${u}"]`);
+  function trimCuts(keep) {
+    for (const [k, u] of made) {
+      if (made.size <= 16) break;
+      if (k === keep || inUse(u)) continue;   // never the one just made, which its caller is about to show
+      URL.revokeObjectURL(u); made.delete(k); cut.delete(k);
+    }
+  }
+  async function cutOut(p) {
     const [n, x, y, w, h] = p.pack, im = await loadPack(n);
     const c = document.createElement('canvas'); c.width = w; c.height = h;
     c.getContext('2d').drawImage(im, x, y, w, h, 0, 0, w, h);
     const u = URL.createObjectURL(await new Promise(r => c.toBlob(r, 'image/jpeg', .92)));
-    cut.set(p.id, u);
-    if (cut.size > 16) { const [k, v] = cut.entries().next().value; URL.revokeObjectURL(v); cut.delete(k); }
+    made.set(p.id, u); trimCuts(p.id);
     if (packImg.size > 6) packImg.delete(packImg.keys().next().value);   // let decoded sheets go
     return u;
+  }
+  function url(p) {
+    if (!p.pack) return Promise.resolve(src(p));
+    if (!cut.has(p.id)) cut.set(p.id, cutOut(p).catch(e => { cut.delete(p.id); throw e; }));
+    return cut.get(p.id);
   }
   // thumbnail cut from a contact sheet: the whole photo at its own shape, or a centred square ({square: true})
   const pc = v => +(v * 100).toFixed(3) + '%';
