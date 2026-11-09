@@ -1,0 +1,70 @@
+# Pull-request pipeline. `verify` runs with no AWS credentials and no context lookups, so PRs from forks are safe.
+# For PRs from branches of this repo, `deploy-beta` then deploys the PR to the beta stage and smoke-tests it, so you
+# can try the change live before merging. Prod is never touched here: only a merge to main (deploy.yml) reaches
+# prod, and only after the owner approves the `prod` environment.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Typecheck, test, build, synth
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # A newer push to the same PR cancels the old checks. This is job-level on purpose: a run-level group would
+    # also cancel a beta deploy half-way through.
+    concurrency:
+      group: ci-verify-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck (backend, infra)
+        run: npm run typecheck:all
+
+      - name: Test (backend, infra)
+        run: npm run test:all
+
+      - name: Build site
+        run: npm run build
+
+      # Synth bundles the Lambda with esbuild and stages dist/ for the Web stack, so it needs the build above.
+      - name: cdk synth (account-beta, account-prod, beta, prod)
+        working-directory: infra
+        run: |
+          for config in account-beta account-prod beta prod; do
+            echo "::group::cdk synth config/app-config-$config.json"
+            npx cdk synth --quiet -c APP_CONFIG="config/app-config-$config.json"
+            echo "::endgroup::"
+          done
+
+  # Deploys the PR to beta once the checks pass. Skipped for forks (no OIDC token, and their code must never run
+  # with AWS credentials), for Dependabot (bumped dependencies reach AWS only after a person merges them), and for
+  # manual runs. Queues behind any other beta deploy (see deploy-stage.yml).
+  deploy-beta:
+    needs: verify
+    if: >-
+      github.event_name == 'pull_request'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && github.event.pull_request.user.login != 'dependabot[bot]'
+    permissions:
+      id-token: write
+      contents: read
+    uses: ./.github/workflows/deploy-stage.yml
+    with:
+      environment: beta

@@ -1,0 +1,36 @@
+{
+  "Project": {
+    "Name": "Photo",
+    "Stage": "Beta",
+    "Account": "411626138124",
+    "Region": "us-east-1",
+    "Profile": "photo-beta"
+  },
+  "Stack": {
+    "Cicd": {
+      "Name": "Cicd",
+      "GitHubRepo": "Njones27/Photo_Website",
+      "GitHubEnvironment": "beta",
+      "GitHubSubjectPrefix": "repo:Njones27@153565100/Photo_Website@1448968508"
+    },
+    "Api": {
+      "Name": "Api",
+      "ThrottleRateLimit": 10,
+      "ThrottleBurstLimit": 20,
+      "BookingRateLimit": 2,
+      "ReservedConcurrency": 0,
+      "LogRetentionDays": 14
+    },
+    "Web": {
+      "Name": "Web",
+      "DomainName": "",
+      "HostedZoneId": "",
+      "CspReportOnly": false
+    },
+    "Ops": {
+      "Name": "Ops",
+      "Api5xxThreshold": 5,
+      "ThrottledThreshold": 50
+    }
+  }
+}

@@ -39,3 +39,9 @@ scripts/build_picker.py
 scripts/build_prototype_assets.py
 scripts/build_quote_form.py
 scripts/quote_form.template.html
+
+# Node, CDK and the built site (npm run build)
+node_modules/
+dist/
+infra/cdk.out/
+*.tsbuildinfo

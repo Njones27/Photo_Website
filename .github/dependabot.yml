@@ -1,0 +1,21 @@
+# Keeps the SHA-pinned actions in .github/workflows and the npm dependencies current. Updates arrive as one grouped
+# pull request per ecosystem per week. ci.yml runs their checks but never deploys them to beta: bumped code only reaches
+# AWS after a person has reviewed and merged it.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      npm-minor-and-patch:
+        update-types: [minor, patch]

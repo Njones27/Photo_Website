@@ -54,6 +54,9 @@ Everything works at phone width: the menu stays on screen, Back returns you to w
 | `content/titles.json` | Every photo's title |
 | `scripts/build_site_set.py` | Builds `site/portfolio.js` and the image files from the Portfolio folder |
 | `scripts/preview_server.py` | Serves `site/` locally |
+| `scripts/build_dist.mjs` | Copies the files the live site needs into `dist/` |
+| `backend/` | The booking API (one Lambda) |
+| `infra/` | The AWS CDK app and deploy scripts |
 
 The source photos live in `~/Pictures/Lightroom Saved Photos/Portfolio`, one folder per shoot. The generated images (`site/p`, `site/k`, `site/t`) aren't committed; rebuild them:
 
@@ -69,7 +72,20 @@ python3 scripts/preview_server.py 8765
 
 Story covers are built at 3200px and other story photos at 2400px, so they stay sharp on high-resolution screens.
 
+## Hosting
+
+The site runs on AWS in two accounts, beta and prod, each behind its own CloudFront URL. Booking requests are emailed to the account's own address through Amazon SES, and you reply to the client straight from your inbox. The CDK app, the setup steps and how deploys flow are in [infra/README.md](infra/README.md). In short:
+
+```bash
+npm ci
+npm run build                                    # site/ -> dist/, what CI uploads
+npm run test:all
+infra/script/publish_photos.sh infra/config/app-config-prod.json   # after rebuilding the photos
+```
+
+A pull request deploys to beta, and merging to main deploys beta and then prod after approval.
+
 ## What's next
 
-- Hosting on AWS, with each photo served at several sizes for phones and large screens
-- Sending booking requests (the form is a preview for now)
+- Each photo served at several sizes for phones and large screens
+- Pointing nathanjonesphoto.co at the prod site

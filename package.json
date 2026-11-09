@@ -1,0 +1,19 @@
+{
+  "name": "nathan-jones-photography",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build_dist.mjs",
+    "preview": "python3 scripts/preview_server.py 8765",
+    "test:all": "npm test -w backend && npm test -w infra",
+    "typecheck:all": "npm run typecheck -w backend && npm run typecheck -w infra"
+  },
+  "workspaces": [
+    "backend",
+    "infra"
+  ],
+  "engines": {
+    "node": ">=24"
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "LambdaLogs",
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      "Resource": [
+        "arn:aws:logs:${REGION}:${ACCOUNT_ID}:log-group:Photo-*",
+        "arn:aws:logs:${REGION}:${ACCOUNT_ID}:log-group:/aws/lambda/Photo-*"
+      ]
+    },
+    {
+      "Sid": "ApiSendBookingEmail",
+      "Effect": "Allow",
+      "Action": "ses:SendEmail",
+      "Resource": "arn:aws:ses:${REGION}:${ACCOUNT_ID}:identity/*"
+    },
+    {
+      "Sid": "BucketDeploymentReadCdkAssets",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetBucket*",
+        "s3:GetObject*",
+        "s3:List*"
+      ],
+      "Resource": [
+        "arn:aws:s3:::cdk-hnb659fds-assets-${ACCOUNT_ID}-${REGION}",
+        "arn:aws:s3:::cdk-hnb659fds-assets-${ACCOUNT_ID}-${REGION}/*"
+      ]
+    },
+    {
+      "Sid": "KmsDecryptCdkAssetsViaS3",
+      "Effect": "Allow",
+      "Action": "kms:Decrypt",
+      "Resource": "arn:aws:kms:${REGION}:${ACCOUNT_ID}:key/*",
+      "Condition": {
+        "StringEquals": {
+          "kms:ViaService": "s3.${REGION}.amazonaws.com"
+        }
+      }
+    },
+    {
+      "Sid": "SiteBucketWriteAndAutoDelete",
+      "Effect": "Allow",
+      "Action": [
+        "s3:Abort*",
+        "s3:DeleteObject*",
+        "s3:GetBucket*",
+        "s3:GetObject*",
+        "s3:List*",
+        "s3:PutBucketPolicy",
+        "s3:PutObject",
+        "s3:PutObjectLegalHold",
+        "s3:PutObjectRetention",
+        "s3:PutObjectTagging",
+        "s3:PutObjectVersionTagging"
+      ],
+      "Resource": [
+        "arn:aws:s3:::photo-*",
+        "arn:aws:s3:::photo-*/*"
+      ]
+    },
+    {
+      "Sid": "BucketDeploymentInvalidation",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:CreateInvalidation",
+        "cloudfront:GetInvalidation"
+      ],
+      "Resource": "arn:aws:cloudfront::${ACCOUNT_ID}:distribution/*"
+    }
+  ]
+}
