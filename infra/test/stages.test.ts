@@ -182,7 +182,13 @@ describe.each(Object.entries(expectations))('%s config', (stage, want) => {
             expect(policy.SecurityHeadersConfig.FrameOptions).toEqual({ FrameOption: 'DENY', Override: true });
             expect(policy.SecurityHeadersConfig.ReferrerPolicy.ReferrerPolicy).toBe('strict-origin-when-cross-origin');
             expect(policy.SecurityHeadersConfig.ContentSecurityPolicy).toEqual({ ContentSecurityPolicy: FIXTURE_CSP, Override: true });
-            expect(policy.CustomHeadersConfig).toBeUndefined();
+            if (stage === 'prod') {
+                expect(policy.CustomHeadersConfig).toBeUndefined();
+            } else {
+                expect(policy.CustomHeadersConfig.Items).toEqual([
+                    { Header: 'X-Robots-Tag', Value: 'noindex, nofollow', Override: true },
+                ]);
+            }
             for (const directive of ["frame-ancestors 'none'", "object-src 'none'", "form-action 'self'", "connect-src 'self'"]) {
                 expect(FIXTURE_CSP).toContain(directive);
             }
@@ -267,6 +273,24 @@ describe('config switches', () => {
         expect(policy.CustomHeadersConfig.Items).toEqual([
             { Header: 'Content-Security-Policy-Report-Only', Value: FIXTURE_CSP, Override: true },
         ]);
+    });
+
+    it('serves a subdomain without www when Web.IncludeWww is false', () => {
+        const file = writeConfigCopy('beta', (config) => {
+            config.Stack.Web.DomainName = 'dev.nathanjonesphoto.co';
+            config.Stack.Web.HostedZoneId = 'Z0000000000000000000';
+            config.Stack.Web.IncludeWww = false;
+        });
+        const template = templateOf(synthConfig(file).stacks.web);
+        template.hasResourceProperties('AWS::CertificateManager::Certificate', {
+            DomainName: 'dev.nathanjonesphoto.co',
+            SubjectAlternativeNames: Match.absent(),
+        });
+        template.hasResourceProperties('AWS::CloudFront::Distribution', {
+            DistributionConfig: Match.objectLike({ Aliases: ['dev.nathanjonesphoto.co'] }),
+        });
+        template.resourcePropertiesCountIs('AWS::Route53::RecordSet', { Type: 'A' }, 1);
+        template.resourcePropertiesCountIs('AWS::Route53::RecordSet', { Type: 'AAAA' }, 1);
     });
 
     it('reserves concurrency when Api.ReservedConcurrency is set', () => {

@@ -19,6 +19,13 @@ export function configBoolean(config: StackConfig, key: string): boolean {
     return value;
 }
 
+/** A boolean that may be left out; missing means `fallback`. */
+export function configOptionalBoolean(config: StackConfig, key: string, fallback: boolean): boolean {
+    const value = config[key] ?? fallback;
+    if (typeof value !== 'boolean') fail(config, key, 'true or false (or left out)');
+    return value;
+}
+
 export function configPositiveInt(config: StackConfig, key: string): number {
     const value = config[key];
     if (typeof value !== 'number' || !Number.isInteger(value) || value <= 0) fail(config, key, 'a positive integer');

@@ -181,6 +181,16 @@ Beta can stay in the sandbox: its confirmations only reach verified addresses, w
    DNS-validated certificate for the apex and `www`, both as aliases on the distribution, and A/AAAA records for each.
    Do this after step 3, because ACM validates through public DNS and the deploy waits until it can.
 
+### Beta on dev.nathanjonesphoto.co
+
+Beta gets its own zone in the beta account, delegated from the prod zone, so each account manages only its own
+records. Every beta response carries `X-Robots-Tag: noindex, nofollow`, so search engines leave it alone.
+
+1. Run `infra/script/setup_subdomain.sh` (it uses the `photo-beta` and `photo-prod` profiles). It creates the
+   `dev.nathanjonesphoto.co` zone in beta, adds its NS record to the prod zone and prints the zone id.
+2. In `config/app-config-beta.json`, set `Web.DomainName` to `dev.nathanjonesphoto.co`, `Web.HostedZoneId` to that id,
+   and `Web.IncludeWww` to `false`, and merge.
+
 ## Tearing down
 
 `script/destroy_stacks.sh config/app-config-beta.json` asks you to type the stage name. Every media bucket and prod's
