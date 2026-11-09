@@ -8,11 +8,11 @@ import { ACCOUNTS, configPath, FIXTURE_CSP, onlyResource, stackIds, synthConfig,
 const expectations = {
     beta: {
         account: ACCOUNTS.beta, prefix: 'Photo-Beta', namespace: 'Photo/Beta', retention: 14, retainSite: false, api5xx: 5,
-        domain: undefined,
+        domain: 'dev.nathanjonesphoto.co', www: false,
     },
     prod: {
         account: ACCOUNTS.prod, prefix: 'Photo-Prod', namespace: 'Photo/Prod', retention: 30, retainSite: true, api5xx: 1,
-        domain: 'nathanjonesphoto.co',
+        domain: 'nathanjonesphoto.co', www: true,
     },
 } as const;
 
@@ -182,7 +182,13 @@ describe.each(Object.entries(expectations))('%s config', (stage, want) => {
             expect(policy.SecurityHeadersConfig.FrameOptions).toEqual({ FrameOption: 'DENY', Override: true });
             expect(policy.SecurityHeadersConfig.ReferrerPolicy.ReferrerPolicy).toBe('strict-origin-when-cross-origin');
             expect(policy.SecurityHeadersConfig.ContentSecurityPolicy).toEqual({ ContentSecurityPolicy: FIXTURE_CSP, Override: true });
-            expect(policy.CustomHeadersConfig).toBeUndefined();
+            if (stage === 'prod') {
+                expect(policy.CustomHeadersConfig).toBeUndefined();
+            } else {
+                expect(policy.CustomHeadersConfig.Items).toEqual([
+                    { Header: 'X-Robots-Tag', Value: 'noindex, nofollow', Override: true },
+                ]);
+            }
             for (const directive of ["frame-ancestors 'none'", "object-src 'none'", "form-action 'self'", "connect-src 'self'"]) {
                 expect(FIXTURE_CSP).toContain(directive);
             }
@@ -203,16 +209,10 @@ describe.each(Object.entries(expectations))('%s config', (stage, want) => {
             }
         });
 
-        it(want.domain ? `serves ${want.domain} and www` : 'creates no DNS records or certificate without a domain', () => {
-            if (want.domain) {
-                template.resourceCountIs('AWS::CertificateManager::Certificate', 1);
-                template.resourceCountIs('AWS::Route53::RecordSet', 4);
-                expect(config.Aliases).toEqual([want.domain, `www.${want.domain}`]);
-            } else {
-                template.resourceCountIs('AWS::CertificateManager::Certificate', 0);
-                template.resourceCountIs('AWS::Route53::RecordSet', 0);
-                expect(config.Aliases).toBeUndefined();
-            }
+        it(`serves ${want.domain}${want.www ? ' and www' : ''}`, () => {
+            template.resourceCountIs('AWS::CertificateManager::Certificate', 1);
+            template.resourceCountIs('AWS::Route53::RecordSet', want.www ? 4 : 2);
+            expect(config.Aliases).toEqual(want.www ? [want.domain, `www.${want.domain}`] : [want.domain]);
         });
     });
 
@@ -267,6 +267,24 @@ describe('config switches', () => {
         expect(policy.CustomHeadersConfig.Items).toEqual([
             { Header: 'Content-Security-Policy-Report-Only', Value: FIXTURE_CSP, Override: true },
         ]);
+    });
+
+    it('serves a subdomain without www when Web.IncludeWww is false', () => {
+        const file = writeConfigCopy('beta', (config) => {
+            config.Stack.Web.DomainName = 'dev.nathanjonesphoto.co';
+            config.Stack.Web.HostedZoneId = 'Z0000000000000000000';
+            config.Stack.Web.IncludeWww = false;
+        });
+        const template = templateOf(synthConfig(file).stacks.web);
+        template.hasResourceProperties('AWS::CertificateManager::Certificate', {
+            DomainName: 'dev.nathanjonesphoto.co',
+            SubjectAlternativeNames: Match.absent(),
+        });
+        template.hasResourceProperties('AWS::CloudFront::Distribution', {
+            DistributionConfig: Match.objectLike({ Aliases: ['dev.nathanjonesphoto.co'] }),
+        });
+        template.resourcePropertiesCountIs('AWS::Route53::RecordSet', { Type: 'A' }, 1);
+        template.resourcePropertiesCountIs('AWS::Route53::RecordSet', { Type: 'AAAA' }, 1);
     });
 
     it('reserves concurrency when Api.ReservedConcurrency is set', () => {

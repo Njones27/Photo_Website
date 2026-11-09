@@ -2,7 +2,8 @@
 //   default        -> site bucket, filled from dist/ on every deploy (gallery.html, portfolio.js, shared/, est/)
 //   /p/* /k/* /t/* -> media bucket, the generated photo files, filled from Nathan's Mac by script/publish_photos.sh
 //   /api/*         -> the HTTP API (booking form), same origin so there is no CORS
-// Optional custom domain (the apex and its www name) when Web.DomainName and Web.HostedZoneId are set.
+// Optional custom domain when Web.DomainName and Web.HostedZoneId are set, plus its www name unless Web.IncludeWww is
+// false (a subdomain such as dev.nathanjonesphoto.co has no www). Outside prod every response says noindex.
 
 import * as crypto from 'crypto';
 import * as fs from 'fs';
@@ -19,7 +20,7 @@ import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
 import { AppContext } from '../lib/template/app-context';
 import { StackConfig } from '../lib/template/app-config';
 import { BaseStack } from '../lib/template/stack/base/base-stack';
-import { configBoolean, configString } from '../lib/config-values';
+import { configBoolean, configOptionalBoolean, configString } from '../lib/config-values';
 
 /** The page CloudFront serves at `/`. */
 export const ROOT_OBJECT = 'gallery.html';
@@ -69,6 +70,7 @@ export class WebStack extends BaseStack {
         const domainName = configString(stackConfig, 'DomainName', '');
         const hostedZoneId = configString(stackConfig, 'HostedZoneId', '');
         const cspReportOnly = configBoolean(stackConfig, 'CspReportOnly');
+        const includeWww = configOptionalBoolean(stackConfig, 'IncludeWww', true);
         // Relative paths are relative to infra/. Overridable with `-c Stack.Web.DistPath=...` (tests do).
         const distDir = path.resolve(__dirname, '..', configString(stackConfig, 'DistPath', '../dist'));
         const rootFile = path.join(distDir, ROOT_OBJECT);
@@ -78,6 +80,10 @@ export class WebStack extends BaseStack {
         }
         const csp = contentSecurityPolicy(inlineScriptHashes(fs.readFileSync(rootFile, 'utf8')));
         const isProd = this.stage === 'prod';
+        const customHeaders: cloudfront.ResponseCustomHeader[] = [];
+        if (cspReportOnly) customHeaders.push({ header: 'Content-Security-Policy-Report-Only', value: csp, override: true });
+        // Beta is a full copy of the site: keep it out of search results so it never competes with the real one.
+        if (!isProd) customHeaders.push({ header: 'X-Robots-Tag', value: 'noindex, nofollow', override: true });
 
         // Everything in the site bucket is rebuilt from git on each deploy, so beta can be torn down completely.
         this.bucket = new s3.Bucket(this, 'SiteBucket', {
@@ -116,9 +122,7 @@ export class WebStack extends BaseStack {
                 },
                 contentSecurityPolicy: cspReportOnly ? undefined : { contentSecurityPolicy: csp, override: true },
             },
-            customHeadersBehavior: cspReportOnly
-                ? { customHeaders: [{ header: 'Content-Security-Policy-Report-Only', value: csp, override: true }] }
-                : undefined,
+            customHeadersBehavior: customHeaders.length > 0 ? { customHeaders } : undefined,
         });
 
         // Resolved at deploy time from SSM: the Api stack's domain and the secret created by setup_initial.sh.
@@ -127,7 +131,7 @@ export class WebStack extends BaseStack {
 
         const customDomain = domainName.length > 0 && hostedZoneId.length > 0;
         // The apex and www both serve the site, so either one people type works.
-        const hostNames = customDomain ? [domainName, `www.${domainName}`] : [];
+        const hostNames = customDomain ? (includeWww ? [domainName, `www.${domainName}`] : [domainName]) : [];
         let certificate: acm.ICertificate | undefined;
         let zone: route53.IHostedZone | undefined;
         if (customDomain) {
@@ -140,7 +144,7 @@ export class WebStack extends BaseStack {
             });
             certificate = new acm.Certificate(this, 'Certificate', {
                 domainName,
-                subjectAlternativeNames: hostNames.slice(1),
+                subjectAlternativeNames: hostNames.length > 1 ? hostNames.slice(1) : undefined,
                 validation: acm.CertificateValidation.fromDns(zone),
             });
         }
@@ -185,8 +189,10 @@ export class WebStack extends BaseStack {
             const target = route53.RecordTarget.fromAlias(new route53Targets.CloudFrontTarget(this.distribution));
             new route53.ARecord(this, 'AliasA', { zone, recordName: domainName, target });
             new route53.AaaaRecord(this, 'AliasAAAA', { zone, recordName: domainName, target });
-            new route53.ARecord(this, 'WwwAliasA', { zone, recordName: `www.${domainName}`, target });
-            new route53.AaaaRecord(this, 'WwwAliasAAAA', { zone, recordName: `www.${domainName}`, target });
+            if (includeWww) {
+                new route53.ARecord(this, 'WwwAliasA', { zone, recordName: `www.${domainName}`, target });
+                new route53.AaaaRecord(this, 'WwwAliasAAAA', { zone, recordName: `www.${domainName}`, target });
+            }
         }
 
         // prune: false, so a file dropped from the site lingers instead of breaking a page someone still has open.

@@ -21,7 +21,7 @@ aws_() { aws --profile "$PROFILE" --region us-east-1 "$@"; }
 command -v dig >/dev/null || { echo "dig is required" >&2; exit 1; }
 
 zone="$(aws_ route53 list-hosted-zones-by-name --dns-name "$DOMAIN." \
-    --query "HostedZones[?Name=='$DOMAIN.' && !Config.PrivateZone].Id | [0]" --output text)"
+    --query "HostedZones[?Name=='$DOMAIN.' && Config.PrivateZone==\`false\`].Id | [0]" --output text)"
 if [ "$zone" = "None" ] || [ -z "$zone" ]; then
     echo "Creating the hosted zone for $DOMAIN"
     zone="$(aws_ route53 create-hosted-zone --name "$DOMAIN" --caller-reference "photo-$(date +%s)" \
