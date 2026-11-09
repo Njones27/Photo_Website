@@ -32,7 +32,7 @@ img { max-width: 100%; }
   position: fixed; inset: 0 0 auto; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 16px;
   padding: calc(14px + env(safe-area-inset-top, 0px)) var(--gr) 14px var(--gl);
   background: linear-gradient(color-mix(in oklab, var(--deep) 80%, transparent), transparent);
-  border-bottom: 1px solid transparent;
+  border-bottom: 1px solid transparent; background-origin: border-box; /* the gradient spans the border too, so it never repeats into a dark line */
   transition: background-color .3s ease, border-color .3s ease, padding .3s ease;
 }
 .is-scrolled .top { padding-block: calc(8px + env(safe-area-inset-top, 0px)) 8px;
