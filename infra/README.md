@@ -148,12 +148,38 @@ Cicd stacks deploy with the caller's own credentials. If a change adds an AWS se
 add the actions to the policy files, run `npm test -w infra`, then re-run `setup_initial.sh` for both accounts
 **before** merging, or the next CI deploy fails with `AccessDenied`.
 
+## Confirmation emails to visitors
+
+After a booking reaches the account's address, the Lambda sends the visitor a short confirmation (session and date
+only, never their own text) with Reply-To set to that address. If it fails, the request still succeeds and the log
+gets a `Confirmation not sent` warning. Two things make it work and keep it out of junk folders, both once per account:
+
+1. **SES production access.** In sandbox mode SES only sends to verified addresses, so confirmations fail. Request it
+   (AWS reviews it, usually within a day):
+
+   ```bash
+   aws sesv2 put-account-details --profile photo-prod --production-access-enabled --mail-type TRANSACTIONAL \
+     --website-url https://nathanjonesphoto.co --contact-language EN \
+     --use-case-description "Booking form on my photography site. Each request emails me once and sends one confirmation to the person who filled it in. No marketing or lists."
+   ```
+
+2. **DKIM for the domain.** Mail sent from `@nathanjonesphoto.co` through SES lands in junk unless the domain signs
+   it. `script/setup_domain.sh` (see Adding the domain) creates the SES domain identity and its three DKIM records.
+
+Beta can stay in the sandbox: its confirmations only reach verified addresses, which is enough for testing.
+
 ## Adding the domain
 
-1. Create a public Route 53 hosted zone for `nathanjonesphoto.co` in the prod account and point the registrar's
-   nameservers at it.
-2. Set `Web.DomainName` and `Web.HostedZoneId` in `config/app-config-prod.json` and merge. The Web stack adds a
-   DNS-validated certificate, the alias on the distribution, and A/AAAA records.
+1. Run `infra/script/setup_domain.sh` (it uses the `photo-prod` profile). It creates the public hosted zone and the
+   SES domain identity, then copies the mail records that are live today (MX, apex TXT, Google's DKIM key, DMARC) into
+   the zone, adds SPF for Google and the three SES DKIM CNAMEs, and prints the zone id and nameservers. It never
+   writes the apex or `www` A/AAAA records, because the Web stack creates those.
+2. Check the registrar's DNS page for records on other subdomains, which the script doesn't copy, and add any to
+   the zone. Mail keeps working only if every mail record is in the zone before the next step.
+3. Point the registrar's nameservers at the zone's four AWS nameservers. The old site stops resolving here.
+4. Set `Web.DomainName` and `Web.HostedZoneId` in `config/app-config-prod.json` and merge. The Web stack adds a
+   DNS-validated certificate for the apex and `www`, both as aliases on the distribution, and A/AAAA records for each.
+   Do this after step 3, because ACM validates through public DNS and the deploy waits until it can.
 
 ## Tearing down
 
@@ -168,4 +194,9 @@ site bucket are kept, along with the SSM parameters and the SES identity; the sc
   `setup_initial.sh` for that account first.
 - **`Could not assume role with OIDC`**: the subject prefix does not match; see GitHub environments above.
 - **CI: `Variable X is not set on the 'beta' environment`**: add it under **Settings → Environments**.
+- **A booking arrived but the visitor got no confirmation**: look for `Confirmation not sent` in the function's log.
+  `MessageRejected ... not verified` means SES is still in sandbox mode (see Confirmation emails above).
+- **No booking email and no error**: every outcome is logged (`Booking rejected` with the field, `Booking dropped by
+  the spam trap`, `Booking sent`). The log group is `aws lambda get-function-configuration --function-name <name>
+  --query LoggingConfig.LogGroup`.
 - **Photos missing on a fresh stage**: run `publish_photos.sh` for it.

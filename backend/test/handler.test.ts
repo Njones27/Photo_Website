@@ -23,13 +23,15 @@ function setup(env: Record<string, string> = {}) {
   const sent: Parameters<Mailer['send']>[0][] = [];
   const mailer: Mailer = { send: vi.fn(async (m) => { sent.push(m); }) };
   const logError = vi.fn();
+  const log = vi.fn();
   const handler = createHandler({
     env: { ORIGIN_VERIFY_SECRET: SECRET, BOOKING_EMAIL: OWNER, STAGE: 'prod', APP_VERSION: 'abc123', ...env },
     mailer,
     now: () => NOW,
     logError,
+    log,
   });
-  return { handler, sent, mailer, logError };
+  return { handler, sent, mailer, logError, log };
 }
 
 const good = {
@@ -73,7 +75,7 @@ describe('POST /api/booking', () => {
     const reply = await handler(event('POST', '/api/booking', good));
     expect(reply.statusCode).toBe(202);
     expect(parse(reply)).toEqual({ ok: true });
-    expect(sent).toHaveLength(1);
+    expect(sent).toHaveLength(2);
     expect(sent[0]).toMatchObject({
       from: `Nathan Jones Photography <${OWNER}>`,
       to: OWNER,
@@ -84,10 +86,50 @@ describe('POST /api/booking', () => {
     expect(sent[0].text).toContain('Golden hour at the arboretum.\nTwo outfits.');
   });
 
+  it('sends the visitor a confirmation that replies to Nathan and repeats none of their text', async () => {
+    const { handler, sent, log } = setup();
+    await handler(event('POST', '/api/booking', { ...good, name: 'Buy pills at spam.example' }));
+    expect(sent[1]).toMatchObject({
+      from: `Nathan Jones Photography <${OWNER}>`,
+      to: 'jamie@example.org',
+      replyTo: OWNER,
+      subject: 'Your booking request with Nathan Jones Photography',
+    });
+    expect(sent[1].text).toContain('Session: Graduation & senior');
+    expect(sent[1].text).toContain('Preferred date: 2026-12-01');
+    expect(sent[1].text).not.toContain('spam.example');
+    expect(sent[1].text).not.toContain('Golden hour');
+    expect(log).toHaveBeenCalledWith('info', 'Confirmation sent', expect.objectContaining({ route: 'POST /api/booking' }));
+  });
+
+  it('still answers 202 and only warns when the confirmation fails (SES sandbox)', async () => {
+    const { handler, mailer, sent, log, logError } = setup();
+    vi.mocked(mailer.send)
+      .mockImplementationOnce(async (m) => { sent.push(m); })
+      .mockRejectedValueOnce(new Error('MessageRejected: Email address is not verified'));
+    const reply = await handler(event('POST', '/api/booking', good));
+    expect(reply.statusCode).toBe(202);
+    expect(sent).toHaveLength(1);
+    expect(sent[0].to).toBe(OWNER);
+    expect(log).toHaveBeenCalledWith('warn', 'Confirmation not sent', expect.objectContaining({
+      error: expect.stringContaining('not verified'),
+    }));
+    expect(logError).not.toHaveBeenCalled();
+  });
+
+  it('logs why a booking was rejected or dropped', async () => {
+    const { handler, log } = setup();
+    await handler(event('POST', '/api/booking', { ...good, date: '2026-01-01' }));
+    expect(log).toHaveBeenCalledWith('info', 'Booking rejected', expect.objectContaining({ status: 400, field: 'date' }));
+    await handler(event('POST', '/api/booking', { ...good, website: 'x' }));
+    expect(log).toHaveBeenCalledWith('info', 'Booking dropped by the spam trap', expect.anything());
+  });
+
   it('tags the subject with the stage outside prod', async () => {
     const { handler, sent } = setup({ STAGE: 'beta' });
     await handler(event('POST', '/api/booking', good));
     expect(sent[0].subject).toBe('[beta] Booking request: Jamie Doe, Graduation & senior');
+    expect(sent[1].subject).toBe('[beta] Your booking request with Nathan Jones Photography');
   });
 
   it('accepts a request with only a name and email', async () => {

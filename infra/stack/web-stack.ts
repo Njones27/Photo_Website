@@ -2,7 +2,7 @@
 //   default        -> site bucket, filled from dist/ on every deploy (gallery.html, portfolio.js, shared/, est/)
 //   /p/* /k/* /t/* -> media bucket, the generated photo files, filled from Nathan's Mac by script/publish_photos.sh
 //   /api/*         -> the HTTP API (booking form), same origin so there is no CORS
-// Optional custom domain when Web.DomainName and Web.HostedZoneId are set.
+// Optional custom domain (the apex and its www name) when Web.DomainName and Web.HostedZoneId are set.
 
 import * as crypto from 'crypto';
 import * as fs from 'fs';
@@ -126,6 +126,8 @@ export class WebStack extends BaseStack {
         const originVerifySecret = this.getParameter('OriginVerifySecret');
 
         const customDomain = domainName.length > 0 && hostedZoneId.length > 0;
+        // The apex and www both serve the site, so either one people type works.
+        const hostNames = customDomain ? [domainName, `www.${domainName}`] : [];
         let certificate: acm.ICertificate | undefined;
         let zone: route53.IHostedZone | undefined;
         if (customDomain) {
@@ -138,6 +140,7 @@ export class WebStack extends BaseStack {
             });
             certificate = new acm.Certificate(this, 'Certificate', {
                 domainName,
+                subjectAlternativeNames: hostNames.slice(1),
                 validation: acm.CertificateValidation.fromDns(zone),
             });
         }
@@ -159,7 +162,7 @@ export class WebStack extends BaseStack {
             defaultRootObject: ROOT_OBJECT,
             httpVersion: cloudfront.HttpVersion.HTTP2_AND_3,
             priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
-            domainNames: customDomain ? [domainName] : undefined,
+            domainNames: customDomain ? hostNames : undefined,
             certificate,
             defaultBehavior: staticBehavior(siteOrigin),
             additionalBehaviors: {
@@ -182,6 +185,8 @@ export class WebStack extends BaseStack {
             const target = route53.RecordTarget.fromAlias(new route53Targets.CloudFrontTarget(this.distribution));
             new route53.ARecord(this, 'AliasA', { zone, recordName: domainName, target });
             new route53.AaaaRecord(this, 'AliasAAAA', { zone, recordName: domainName, target });
+            new route53.ARecord(this, 'WwwAliasA', { zone, recordName: `www.${domainName}`, target });
+            new route53.AaaaRecord(this, 'WwwAliasAAAA', { zone, recordName: `www.${domainName}`, target });
         }
 
         // prune: false, so a file dropped from the site lingers instead of breaking a page someone still has open.
