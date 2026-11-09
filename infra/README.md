@@ -164,22 +164,18 @@ gets a `Confirmation not sent` warning. Two things make it work and keep it out 
    ```
 
 2. **DKIM for the domain.** Mail sent from `@nathanjonesphoto.co` through SES lands in junk unless the domain signs
-   it. Create the domain identity and add the three CNAME records it prints at the domain's DNS host, as
-   `<token>._domainkey.nathanjonesphoto.co` pointing to `<token>.dkim.amazonses.com`:
-
-   ```bash
-   aws sesv2 create-email-identity --profile photo-prod --email-identity nathanjonesphoto.co \
-     --query 'DkimAttributes.Tokens'
-   ```
+   it. `script/setup_domain.sh` (see Adding the domain) creates the SES domain identity and its three DKIM records.
 
 Beta can stay in the sandbox: its confirmations only reach verified addresses, which is enough for testing.
 
 ## Adding the domain
 
-1. Create a public Route 53 hosted zone for `nathanjonesphoto.co` in the prod account.
-2. Copy every record the domain still needs into it **before** moving the nameservers, above all the MX, SPF and
-   DKIM records of the mailbox on this domain, or mail stops arriving. Leave out the old site's apex and `www`
-   records: the Web stack creates those, and CloudFormation fails on a record that already exists.
+1. Run `infra/script/setup_domain.sh` (it uses the `photo-prod` profile). It creates the public hosted zone and the
+   SES domain identity, then copies the mail records that are live today (MX, apex TXT, Google's DKIM key, DMARC) into
+   the zone, adds SPF for Google and the three SES DKIM CNAMEs, and prints the zone id and nameservers. It never
+   writes the apex or `www` A/AAAA records, because the Web stack creates those.
+2. Check the registrar's DNS page for records on other subdomains, which the script doesn't copy, and add any to
+   the zone. Mail keeps working only if every mail record is in the zone before the next step.
 3. Point the registrar's nameservers at the zone's four AWS nameservers. The old site stops resolving here.
 4. Set `Web.DomainName` and `Web.HostedZoneId` in `config/app-config-prod.json` and merge. The Web stack adds a
    DNS-validated certificate for the apex and `www`, both as aliases on the distribution, and A/AAAA records for each.
