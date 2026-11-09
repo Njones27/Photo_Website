@@ -14,12 +14,16 @@ export const LIMITS = { name: 100, email: 254, message: 4000 } as const;
 
 const EMAIL = /^[^\s@<>()",;:]+@[^\s@<>()",;:]+\.[^\s@<>()",;:]+$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
+/** What a time input sends: 24-hour HH:MM, sometimes with seconds. */
+const TIME = /^([01]\d|2[0-3]):([0-5]\d)(:[0-5]\d(\.\d+)?)?$/;
 
 export interface Booking {
   name: string;
   email: string;
   type: string;
   date: string;
+  /** 24-hour HH:MM. */
+  time: string;
   message: string;
 }
 
@@ -47,21 +51,32 @@ export function parseBooking(body: unknown, today: Date): Parsed {
   if (!(type in SESSION_TYPES)) return bad('type', 'Please pick a session type.');
 
   const date = text(input.date);
-  if (date) {
-    const parsed = DATE.test(date) ? new Date(`${date}T00:00:00Z`) : null;
-    if (!parsed || Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) {
-      return bad('date', 'Please check the date.');
-    }
-    // A day of slack for time zones: "today" in Hawaii is yesterday in UTC.
-    if (parsed.getTime() < today.getTime() - 2 * 86_400_000) return bad('date', 'Please pick a date that is still ahead.');
+  if (!date) return bad('date', 'Please pick a date.');
+  const parsed = DATE.test(date) ? new Date(`${date}T00:00:00Z`) : null;
+  if (!parsed || Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) {
+    return bad('date', 'Please check the date.');
   }
+  // A day of slack for time zones: "today" in Hawaii is yesterday in UTC.
+  if (parsed.getTime() < today.getTime() - 2 * 86_400_000) return bad('date', 'Please pick a date that is still ahead.');
+
+  const rawTime = text(input.time);
+  if (!rawTime) return bad('time', 'Please pick a time.');
+  if (!TIME.test(rawTime)) return bad('time', 'Please check the time.');
+  const time = rawTime.slice(0, 5);
 
   const message = text(input.message).replace(/\r\n?/g, '\n');
+  if (!message) return bad('message', 'Please tell me a little about what you have in mind.');
   if (message.length > LIMITS.message) return { ok: false, reply: fail('payload_too_large', MESSAGES.tooLarge, 'message') };
 
   // Honeypot: a field people never see. Bots that fill every input get a normal "sent" answer and no email.
   const spam = text(input.website).length > 0;
-  return { ok: true, booking: { name, email, type, date, message }, spam };
+  return { ok: true, booking: { name, email, type, date, time, message }, spam };
+}
+
+/** "14:30" as "2:30 PM", the way people write it in an email. */
+export function clockTime(time: string): string {
+  const [h, m] = time.split(':').map(Number);
+  return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
 }
 
 export function bookingEmail(booking: Booking, stage: string): { subject: string; text: string } {
@@ -75,9 +90,10 @@ export function bookingEmail(booking: Booking, stage: string): { subject: string
       `Name: ${booking.name}`,
       `Email: ${booking.email}`,
       `Session: ${session}`,
-      `Preferred date: ${booking.date || 'not given'}`,
+      `Preferred date: ${booking.date}`,
+      `Preferred time: ${clockTime(booking.time)}`,
       '',
-      booking.message || '(no message)',
+      booking.message,
       '',
       `Reply to this email to answer ${booking.name} directly.`,
     ].join('\n'),
@@ -85,7 +101,7 @@ export function bookingEmail(booking: Booking, stage: string): { subject: string
 }
 
 /**
- * The visitor's copy. It repeats only values the form picked from a list (session and date), never the name or the
+ * The visitor's copy. It repeats only values the form picked from a list (session, date, and time), never the name or the
  * message, so nobody can use the form to send their own text to someone else's inbox.
  */
 export function confirmationEmail(booking: Booking, stage: string): { subject: string; text: string } {
@@ -98,7 +114,8 @@ export function confirmationEmail(booking: Booking, stage: string): { subject: s
       'Thanks for your booking request. It reached me, and I will reply by email soon to talk through the details.',
       '',
       `Session: ${SESSION_TYPES[booking.type]}`,
-      `Preferred date: ${booking.date || 'not given'}`,
+      `Preferred date: ${booking.date}`,
+      `Preferred time: ${clockTime(booking.time)}`,
       '',
       'If you want to add anything, just reply to this email.',
       '',

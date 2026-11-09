@@ -39,6 +39,7 @@ const good = {
   email: 'jamie@example.org',
   type: 'senior',
   date: '2026-12-01',
+  time: '17:30',
   message: 'Golden hour at the arboretum.\nTwo outfits.',
 };
 
@@ -83,6 +84,7 @@ describe('POST /api/booking', () => {
       subject: 'Booking request: Jamie Doe, Graduation & senior',
     });
     expect(sent[0].text).toContain('Preferred date: 2026-12-01');
+    expect(sent[0].text).toContain('Preferred time: 5:30 PM');
     expect(sent[0].text).toContain('Golden hour at the arboretum.\nTwo outfits.');
   });
 
@@ -97,6 +99,7 @@ describe('POST /api/booking', () => {
     });
     expect(sent[1].text).toContain('Session: Graduation & senior');
     expect(sent[1].text).toContain('Preferred date: 2026-12-01');
+    expect(sent[1].text).toContain('Preferred time: 5:30 PM');
     expect(sent[1].text).not.toContain('spam.example');
     expect(sent[1].text).not.toContain('Golden hour');
     expect(log).toHaveBeenCalledWith('info', 'Confirmation sent', expect.objectContaining({ route: 'POST /api/booking' }));
@@ -132,12 +135,29 @@ describe('POST /api/booking', () => {
     expect(sent[1].subject).toBe('[beta] Your booking request with Nathan Jones Photography');
   });
 
-  it('accepts a request with only a name and email', async () => {
+  it('rejects a request with only a name and email', async () => {
     const { handler, sent } = setup();
     const reply = await handler(event('POST', '/api/booking', { name: 'Sam', email: 'sam@example.com' }));
-    expect(reply.statusCode).toBe(202);
-    expect(sent[0].subject).toBe('Booking request: Sam, Something else');
-    expect(sent[0].text).toContain('Preferred date: not given');
+    expect(reply.statusCode).toBe(400);
+    expect(parse(reply).field).toBe('date');
+    expect(sent).toHaveLength(0);
+  });
+
+  it('defaults a missing session type to "Something else"', async () => {
+    const { handler, sent } = setup();
+    const { type: _, ...rest } = good;
+    expect((await handler(event('POST', '/api/booking', rest))).statusCode).toBe(202);
+    expect(sent[0].subject).toBe('Booking request: Jamie Doe, Something else');
+  });
+
+  it.each([
+    ['00:05', '12:05 AM'],
+    ['12:00', '12:00 PM'],
+    ['09:15:00', '9:15 AM'],
+  ])('writes the time %s as %s', async (time, shown) => {
+    const { handler, sent } = setup();
+    await handler(event('POST', '/api/booking', { ...good, time }));
+    expect(sent[0].text).toContain(`Preferred time: ${shown}`);
   });
 
   it('keeps line breaks and control characters out of the subject', async () => {
@@ -153,6 +173,12 @@ describe('POST /api/booking', () => {
     ['an unknown session type', { ...good, type: 'wedding' }, 'type'],
     ['an impossible date', { ...good, date: '2026-02-30' }, 'date'],
     ['a past date', { ...good, date: '2026-01-01' }, 'date'],
+    ['a missing date', { ...good, date: '' }, 'date'],
+    ['a missing time', { ...good, time: ' ' }, 'time'],
+    ['an impossible time', { ...good, time: '25:00' }, 'time'],
+    ['a time that is not a time', { ...good, time: 'noon' }, 'time'],
+    ['a missing message', { ...good, message: ' \n ' }, 'message'],
+    ['a missing email', { ...good, email: '' }, 'email'],
     ['a long name', { ...good, name: 'x'.repeat(LIMITS.name + 1) }, 'name'],
   ])('rejects %s and sends nothing', async (_, body, field) => {
     const { handler, sent } = setup();
