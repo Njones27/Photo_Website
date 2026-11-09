@@ -1,0 +1,115 @@
+# Deploys one stage. Called by deploy.yml (main: beta, then prod) and ci.yml (open PRs: beta only); everything stage-specific comes from the GitHub environment's
+# variables (set them with the commands script/setup_initial.sh prints, see infra/README.md):
+#   AWS_DEPLOY_ROLE_ARN, AWS_REGION, AWS_ACCOUNT_ID, APP_CONFIG
+name: Deploy stage
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: GitHub environment to deploy (beta or prod)
+        type: string
+        required: true
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: ${{ inputs.environment }}
+      url: ${{ steps.smoke.outputs.url }}
+    # One deploy per environment at a time, never cancelled half-way. If several queue up behind it,
+    # GitHub keeps only the newest. beta and prod use separate groups, so a pending prod approval never blocks beta.
+    concurrency:
+      group: deploy-${{ inputs.environment }}
+      cancel-in-progress: false
+    env:
+      APP_CONFIG: ${{ vars.APP_CONFIG }}
+      APP_VERSION: ${{ github.sha }}
+      AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
+      AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      DEPLOY_ENVIRONMENT: ${{ inputs.environment }}
+    steps:
+      - name: Check environment variables
+        run: |
+          missing=0
+          for name in AWS_DEPLOY_ROLE_ARN AWS_REGION AWS_ACCOUNT_ID APP_CONFIG; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Variable $name is not set on the '$DEPLOY_ENVIRONMENT' environment (see infra/README.md)."
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Read stage from config
+        working-directory: infra
+        run: |
+          node -e '
+            const fs = require("fs");
+            const c = require(require("path").resolve(process.env.APP_CONFIG));
+            if (c.Project.Account !== process.env.AWS_ACCOUNT_ID) {
+              console.log(`::error::${process.env.APP_CONFIG} targets account ${c.Project.Account}, but AWS_ACCOUNT_ID is ${process.env.AWS_ACCOUNT_ID}.`);
+              process.exit(1);
+            }
+            const prefix = `${c.Project.Name}-${c.Project.Stage}`;
+            fs.appendFileSync(process.env.GITHUB_ENV, `STACK_PREFIX=${prefix}\n`);
+            console.log(`Deploying ${prefix} from ${process.env.APP_CONFIG}`);
+          '
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: photo-${{ inputs.environment }}-${{ github.run_id }}
+
+      - name: Build site
+        run: npm run build
+
+      # Cicd (the role this job runs as) is deliberately not deployed here: only script/setup_initial.sh changes it.
+      # Same stack list as infra/script/deploy_stacks.sh.
+      - name: cdk deploy
+        working-directory: infra
+        run: |
+          npx cdk deploy \
+            "$STACK_PREFIX-Api" "$STACK_PREFIX-Web" "$STACK_PREFIX-Ops" \
+            --require-approval never -c APP_CONFIG="$APP_CONFIG"
+
+      - name: Smoke test
+        id: smoke
+        run: |
+          domain="$(aws ssm get-parameter --name "$STACK_PREFIX-DistributionDomain" --query Parameter.Value --output text)"
+          echo "url=https://$domain" >> "$GITHUB_OUTPUT"
+
+          health="$(curl -fsS --retry 5 --retry-delay 10 --retry-all-errors "https://$domain/api/health")"
+          echo "GET /api/health -> $health"
+          if ! grep -q '"ok":true' <<< "$health"; then
+            echo "::error::/api/health did not report ok:true"
+            exit 1
+          fi
+          if ! grep -q "$APP_VERSION" <<< "$health"; then
+            echo "::warning::/api/health does not report version $APP_VERSION yet"
+          fi
+
+          status="$(curl -fsSI --retry 5 --retry-delay 10 --retry-all-errors -o /dev/null -w '%{http_code}' "https://$domain/")"
+          echo "HEAD / -> $status"
+          if [ "$status" != "200" ]; then
+            echo "::error::https://$domain/ returned $status"
+            exit 1
+          fi

@@ -1,0 +1,21 @@
+{
+  "Project": {
+    "Name": "Photo",
+    "Stage": "Account",
+    "Account": "209662578564",
+    "Region": "us-east-1",
+    "Profile": "photo-prod"
+  },
+  "Stack": {
+    "GitHubOidc": {
+      "Name": "GitHubOidc",
+      "CreateProvider": true,
+      "ExistingProviderArn": "",
+      "BudgetEmail": "",
+      "BudgetLimitsUsd": [
+        10,
+        25
+      ]
+    }
+  }
+}

@@ -1,0 +1,34 @@
+# Every push to main (a merged PR) deploys beta, smoke-tests it, then waits for approval on the `prod` environment
+# (required reviewer) and deploys prod. Manual runs can stop after beta. Open PRs deploy to beta only, from ci.yml.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: How far to deploy (prod still needs its environment approval)
+        type: choice
+        options: [beta, prod]
+        default: beta
+
+permissions:
+  id-token: write
+  contents: read
+
+# Concurrency is per environment (see deploy-stage.yml), so a prod deploy waiting for approval never holds
+# up the next beta deploy.
+
+jobs:
+  beta:
+    uses: ./.github/workflows/deploy-stage.yml
+    with:
+      environment: beta
+
+  prod:
+    needs: beta
+    if: github.event_name == 'push' || inputs.stage == 'prod'
+    uses: ./.github/workflows/deploy-stage.yml
+    with:
+      environment: prod

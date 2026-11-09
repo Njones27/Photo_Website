@@ -1,0 +1,17 @@
+{
+  "name": "@photo/backend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@aws-sdk/client-sesv2": "^3.1161.0",
+    "@types/aws-lambda": "^8.10.164",
+    "@types/node": "^24.19.2",
+    "typescript": "~7.0",
+    "vitest": "^5.0.5"
+  }
+}
