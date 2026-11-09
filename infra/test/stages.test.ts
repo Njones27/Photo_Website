@@ -8,11 +8,11 @@ import { ACCOUNTS, configPath, FIXTURE_CSP, onlyResource, stackIds, synthConfig,
 const expectations = {
     beta: {
         account: ACCOUNTS.beta, prefix: 'Photo-Beta', namespace: 'Photo/Beta', retention: 14, retainSite: false, api5xx: 5,
-        domain: undefined,
+        domain: 'dev.nathanjonesphoto.co', www: false,
     },
     prod: {
         account: ACCOUNTS.prod, prefix: 'Photo-Prod', namespace: 'Photo/Prod', retention: 30, retainSite: true, api5xx: 1,
-        domain: 'nathanjonesphoto.co',
+        domain: 'nathanjonesphoto.co', www: true,
     },
 } as const;
 
@@ -209,16 +209,10 @@ describe.each(Object.entries(expectations))('%s config', (stage, want) => {
             }
         });
 
-        it(want.domain ? `serves ${want.domain} and www` : 'creates no DNS records or certificate without a domain', () => {
-            if (want.domain) {
-                template.resourceCountIs('AWS::CertificateManager::Certificate', 1);
-                template.resourceCountIs('AWS::Route53::RecordSet', 4);
-                expect(config.Aliases).toEqual([want.domain, `www.${want.domain}`]);
-            } else {
-                template.resourceCountIs('AWS::CertificateManager::Certificate', 0);
-                template.resourceCountIs('AWS::Route53::RecordSet', 0);
-                expect(config.Aliases).toBeUndefined();
-            }
+        it(`serves ${want.domain}${want.www ? ' and www' : ''}`, () => {
+            template.resourceCountIs('AWS::CertificateManager::Certificate', 1);
+            template.resourceCountIs('AWS::Route53::RecordSet', want.www ? 4 : 2);
+            expect(config.Aliases).toEqual(want.www ? [want.domain, `www.${want.domain}`] : [want.domain]);
         });
     });
 
