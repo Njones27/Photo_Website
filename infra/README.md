@@ -176,10 +176,14 @@ Beta can stay in the sandbox: its confirmations only reach verified addresses, w
 
 ## Adding the domain
 
-1. Create a public Route 53 hosted zone for `nathanjonesphoto.co` in the prod account and point the registrar's
-   nameservers at it.
-2. Set `Web.DomainName` and `Web.HostedZoneId` in `config/app-config-prod.json` and merge. The Web stack adds a
-   DNS-validated certificate, the alias on the distribution, and A/AAAA records.
+1. Create a public Route 53 hosted zone for `nathanjonesphoto.co` in the prod account.
+2. Copy every record the domain still needs into it **before** moving the nameservers, above all the MX, SPF and
+   DKIM records of the mailbox on this domain, or mail stops arriving. Leave out the old site's apex and `www`
+   records: the Web stack creates those, and CloudFormation fails on a record that already exists.
+3. Point the registrar's nameservers at the zone's four AWS nameservers. The old site stops resolving here.
+4. Set `Web.DomainName` and `Web.HostedZoneId` in `config/app-config-prod.json` and merge. The Web stack adds a
+   DNS-validated certificate for the apex and `www`, both as aliases on the distribution, and A/AAAA records for each.
+   Do this after step 3, because ACM validates through public DNS and the deploy waits until it can.
 
 ## Tearing down
 

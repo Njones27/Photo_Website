@@ -268,7 +268,7 @@ describe('config switches', () => {
         });
     });
 
-    it('serves a custom domain with a DNS-validated certificate and A/AAAA aliases once one is set', () => {
+    it('serves the apex and www with a DNS-validated certificate and A/AAAA aliases once a domain is set', () => {
         const file = writeConfigCopy('prod', (config) => {
             config.Stack.Web.DomainName = 'nathanjonesphoto.co';
             config.Stack.Web.HostedZoneId = 'Z0000000000000000000';
@@ -276,12 +276,14 @@ describe('config switches', () => {
         const template = templateOf(synthConfig(file).stacks.web);
         template.hasResourceProperties('AWS::CertificateManager::Certificate', {
             DomainName: 'nathanjonesphoto.co',
+            SubjectAlternativeNames: ['www.nathanjonesphoto.co'],
             ValidationMethod: 'DNS',
         });
         template.hasResourceProperties('AWS::CloudFront::Distribution', {
-            DistributionConfig: Match.objectLike({ Aliases: ['nathanjonesphoto.co'] }),
+            DistributionConfig: Match.objectLike({ Aliases: ['nathanjonesphoto.co', 'www.nathanjonesphoto.co'] }),
         });
-        template.resourcePropertiesCountIs('AWS::Route53::RecordSet', { Type: 'A' }, 1);
-        template.resourcePropertiesCountIs('AWS::Route53::RecordSet', { Type: 'AAAA' }, 1);
+        template.resourcePropertiesCountIs('AWS::Route53::RecordSet', { Type: 'A' }, 2);
+        template.resourcePropertiesCountIs('AWS::Route53::RecordSet', { Type: 'AAAA' }, 2);
+        template.hasResourceProperties('AWS::Route53::RecordSet', { Type: 'A', Name: 'www.nathanjonesphoto.co.' });
     });
 });
