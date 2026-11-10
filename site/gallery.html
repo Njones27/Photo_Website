@@ -579,9 +579,10 @@ const BOOK = `
     <form id="book-form">
       <label>Name<input id="f-name" name="name" autocomplete="name" required></label>
       <label>Email<input id="f-email" name="email" type="email" autocomplete="email" inputmode="email" required></label>
-      <label>Session<select id="f-type" name="type">${RATES.map(r => `<option value="${r.id}">${r.name}</option>`).join('')}<option value="other">Something else</option></select></label>
-      <label>Preferred date<input id="f-date" name="date" type="date"></label>
-      <label class="full">What do you have in mind?<textarea id="f-msg" name="message" maxlength="4000" placeholder="Location ideas, number of people, the look you want"></textarea></label>
+      <label class="full">Session<select id="f-type" name="type" required>${RATES.map(r => `<option value="${r.id}">${r.name}</option>`).join('')}<option value="other">Something else</option></select></label>
+      <label>Preferred date<input id="f-date" name="date" type="date" required></label>
+      <label>Preferred time<input id="f-time" name="time" type="time" required></label>
+      <label class="full">What do you have in mind?<textarea id="f-msg" name="message" maxlength="4000" required placeholder="Location ideas, number of people, the look you want"></textarea></label>
       <label class="hp" aria-hidden="true">Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label>
       <p class="form-note">You'll get a confirmation email right away. If it isn't in your inbox within a few minutes, check your junk or spam folder.</p>
       <button class="send" type="submit" id="send">Send request</button>
@@ -589,11 +590,15 @@ const BOOK = `
     </form>
   </section>`;
 $('#book-slot').innerHTML = BOOK;
+{ const d = new Date(); $('#f-date').min = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; } /* no dates in the past */
 /* booking requests go to /api/booking on the same site, which emails them to Nathan */
 $('#book-form').addEventListener('submit', async e => {
   e.preventDefault();
   const form = e.currentTarget, sent = $('#sent'), send = $('#send');
   if (send.disabled) return;
+  // Every field is required. A field of only spaces passes the browser's own check, so trim first and check again.
+  for (const el of form.querySelectorAll('input[required], textarea[required]')) el.value = el.value.trim();
+  if (!form.reportValidity()) return;
   const say = (text, bad) => { sent.textContent = text; sent.classList.toggle('is-bad', !!bad); sent.hidden = false; };
   send.disabled = true; send.textContent = 'Sending…'; sent.hidden = true;
   try {
