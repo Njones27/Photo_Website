@@ -79,13 +79,24 @@ export function clockTime(time: string): string {
   return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
 }
 
+/** The first word of the name, for the greeting ("Jamie Doe" says "Hi Jamie,"). */
+const firstName = (name: string): string => name.split(' ')[0];
+
+/**
+ * The one booking email. It goes To the visitor with Nathan's mailbox in Cc, so both hold the same message and any reply
+ * from either side lands in one conversation. It reads as a confirmation to the visitor and repeats everything they sent,
+ * which is what Nathan needs to answer.
+ */
 export function bookingEmail(booking: Booking, stage: string): { subject: string; text: string } {
   const session = SESSION_TYPES[booking.type];
   const tag = stage && stage !== 'prod' ? `[${stage}] ` : '';
   return {
     subject: `${tag}Booking request: ${booking.name}, ${session}`,
     text: [
-      `${booking.name} asked to book a session through the website.`,
+      `Hi ${firstName(booking.name)},`,
+      '',
+      'Thanks for your booking request with Nathan Jones Photography. It reached me, and I will reply soon to talk '
+        + 'through the details. Here is what you sent.',
       '',
       `Name: ${booking.name}`,
       `Email: ${booking.email}`,
@@ -93,31 +104,11 @@ export function bookingEmail(booking: Booking, stage: string): { subject: string
       `Preferred date: ${booking.date}`,
       `Preferred time: ${clockTime(booking.time)}`,
       '',
+      'Message:',
       booking.message,
       '',
-      `Reply to this email to answer ${booking.name} directly.`,
-    ].join('\n'),
-  };
-}
-
-/**
- * The visitor's copy. It repeats only values the form picked from a list (session, date, and time), never the name or the
- * message, so nobody can use the form to send their own text to someone else's inbox.
- */
-export function confirmationEmail(booking: Booking, stage: string): { subject: string; text: string } {
-  const tag = stage && stage !== 'prod' ? `[${stage}] ` : '';
-  return {
-    subject: `${tag}Your booking request with Nathan Jones Photography`,
-    text: [
-      'Hi,',
-      '',
-      'Thanks for your booking request. It reached me, and I will reply by email soon to talk through the details.',
-      '',
-      `Session: ${SESSION_TYPES[booking.type]}`,
-      `Preferred date: ${booking.date}`,
-      `Preferred time: ${clockTime(booking.time)}`,
-      '',
-      'If you want to add anything, just reply to this email.',
+      'If you want to add anything, just reply to this email. Replies reach both of us, so the whole conversation '
+        + 'stays in one thread.',
       '',
       'Nathan Jones',
       '',
@@ -128,9 +119,11 @@ export function confirmationEmail(booking: Booking, stage: string): { subject: s
 }
 
 /**
- * `POST /api/booking`: emails the request to the AWS account's own address with the visitor as Reply-To, then sends
- * the visitor a confirmation. A failed confirmation is logged as a warning and does not fail the request, because
- * Nathan already has it (and SES in sandbox mode refuses unverified recipients, so beta usually can't send it).
+ * `POST /api/booking`: sends one email From the account's own address, To the visitor and Cc the account's address,
+ * with both as Reply-To so a plain Reply from either side reaches the other and stays in the same thread.
+ *
+ * If SES refuses that send (for example beta, which is still in the SES sandbox and only mails verified addresses),
+ * Nathan still gets an owner-only copy that replies to the visitor, so a booking is never lost.
  */
 export async function createBooking({ body, env, now, mailer, log }: ApiRequest): Promise<Reply> {
   const parsed = parseBooking(body, now);
@@ -148,15 +141,25 @@ export async function createBooking({ body, env, now, mailer, log }: ApiRequest)
   const stage = env.STAGE ?? '';
   const { booking } = parsed;
   const from = `Nathan Jones Photography <${owner}>`;
-
-  await mailer().send({ from, to: owner, replyTo: booking.email, ...bookingEmail(booking, stage) });
-  log('info', 'Booking sent', { type: booking.type });
+  const email = bookingEmail(booking, stage);
 
   try {
-    await mailer().send({ from, to: booking.email, replyTo: owner, ...confirmationEmail(booking, stage) });
-    log('info', 'Confirmation sent');
+    await mailer().send({ from, to: [booking.email], cc: [owner], replyTo: [booking.email, owner], ...email });
+    log('info', 'Booking sent', { type: booking.type });
+    return json(202, { ok: true });
   } catch (err) {
-    log('warn', 'Confirmation not sent', { error: err instanceof Error ? err.message : String(err) });
+    log('warn', 'Shared booking email not sent, sending Nathan his copy only', {
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
+
+  await mailer().send({
+    from,
+    to: [owner],
+    replyTo: [booking.email],
+    subject: email.subject,
+    text: `The copy to ${booking.email} could not be sent, so only you have this one. Reply to answer them.\n\n${email.text}`,
+  });
+  log('info', 'Booking sent to Nathan only', { type: booking.type });
   return json(202, { ok: true });
 }

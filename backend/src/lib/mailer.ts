@@ -5,11 +5,11 @@ import type { Mailer } from './http';
 export class SesMailer implements Mailer {
   private readonly client = new SESv2Client({});
 
-  async send({ from, to, replyTo, subject, text }: Parameters<Mailer['send']>[0]): Promise<void> {
+  async send({ from, to, cc, replyTo, subject, text }: Parameters<Mailer['send']>[0]): Promise<void> {
     await this.client.send(new SendEmailCommand({
       FromEmailAddress: from,
-      Destination: { ToAddresses: [to] },
-      ReplyToAddresses: [replyTo],
+      Destination: { ToAddresses: to, ...(cc?.length ? { CcAddresses: cc } : {}) },
+      ReplyToAddresses: replyTo,
       Content: {
         Simple: {
           Subject: { Data: subject, Charset: 'UTF-8' },
