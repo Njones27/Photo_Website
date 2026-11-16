@@ -48,7 +48,14 @@ export interface Env {
 
 /** Sends one email. The real one wraps SES; tests pass a fake. */
 export interface Mailer {
-  send(message: { from: string; to: string; replyTo: string; subject: string; text: string }): Promise<void>;
+  send(message: {
+    from: string;
+    to: string[];
+    cc?: string[];
+    replyTo: string[];
+    subject: string;
+    text: string;
+  }): Promise<void>;
 }
 
 /** What a route gets: the parsed JSON body (undefined when there was none), lower-cased headers, and its tools. */
